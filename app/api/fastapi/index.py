@@ -789,9 +789,9 @@ app = FastAPI(
 origns = [
     
     "http://localhost:3000/",
-    "https://ai-chatbot-eight-ruby.vercel.app/",
     "http://revitalise.io/",
-    "http://revitalise.io/app/"
+    "http://revitalise.io/app/",
+    "https://ai-chatbot-v1.vercel.app/"
         
         ]
 

@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 module.exports = {
   images: {
-    domains: ['http://localhost:3000', 'http://revitalise.io'],
+    domains: ['https://ai-chatbot-v1.vercel.app','http://localhost:3000', 'http://revitalise.io'],
     remotePatterns: [
       {
         protocol: 'https',
