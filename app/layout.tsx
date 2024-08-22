@@ -7,7 +7,7 @@ import { TailwindIndicator } from '@/components/tailwind-indicator'
 import { Providers } from '@/components/providers'
 import { Header } from '@/components/header'
 import { Toaster } from '@/components/ui/sonner'
-
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/react"
 
 export const metadata = {
@@ -61,6 +61,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
           <TailwindIndicator />
         </Providers>
         <Analytics />
+        <SpeedInsights />
 
       </body>
     </html>
