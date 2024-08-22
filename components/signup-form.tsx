@@ -86,10 +86,10 @@ export default function SignupForm() {
 
         <div className="flex justify-center">
         <button
-            className="my-4 flex h-10 w-10 flex-row items-center justify-center rounded-md bg-white p-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-200 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-300"
+            className="my-4 flex h-10 w-10 items-center justify-center rounded-md bg-white p-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-200 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-300"
             onClick={handleGoogleLoginClick}
           >
-            <IconGoogle/>
+            <IconGoogle className="h-6 w-6"/>
           </button>
         </div>
       </div>
