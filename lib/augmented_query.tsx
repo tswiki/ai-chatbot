@@ -14,7 +14,7 @@ export const semantic_search = async (query: string ) => {
     const encodedQuery = encodeURIComponent(query);
 
     // Construct the URL
-    const url = `http://backend:8000/api/semanticsearch/${encodedQuery}`;
+    const url = `https://serverless-v1.vercel.app/api/semanticsearch/${encodedQuery}`;
 
     // Set the headers
     const headers = {
