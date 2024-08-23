@@ -10,11 +10,7 @@ import { getUser } from './app/login/actions'
 //export const { auth, signIn, signOut } = NextAuth(authConfig)
 
 export const {
-  handlers: { GET, POST },
-  auth,
-  signIn,
-  signOut
-} = NextAuth({
+  handlers: { GET, POST }, auth, signIn, signOut} = NextAuth({
   ...authConfig,
   providers: [
 
@@ -55,5 +51,18 @@ export const {
         return null
       }
     })
-  ]
+  ],
+  // Add the following configuration
+  useSecureCookies: process.env.NODE_ENV === 'production',
+  cookies: {
+    pkceCodeVerifier: {
+      name: 'next-auth.pkce.code_verifier',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production'
+      }
+    }
+  }
 })

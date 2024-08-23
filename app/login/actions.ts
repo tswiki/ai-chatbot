@@ -39,7 +39,9 @@ export async function authenticate(
       await signIn('credentials', {
         email,
         password,
-        redirect: false
+        redirect: false,
+        callbackUrl: '/api/auth/callback/credentials'
+
       })
 
       return {
