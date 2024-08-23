@@ -69,7 +69,11 @@ export async function Header() {
           className={cn(buttonVariants())}
         >
           <span className="hidden sm:block">Creators' Library</span>
-          <span className="sm:hidden">Library</span>
+          <span className="sm:hidden"><img
+          src="/favicon.ico"
+          className="hidden size-6 mr- dark:block"
+          />
+          </span>
         </a>
       </div>
     </header>
