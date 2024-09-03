@@ -14,7 +14,8 @@ export const semantic_search = async (query: string ) => {
     const encodedQuery = encodeURIComponent(query);
 
     // Construct the URL
-    const url = `https://serverless-v1.vercel.app/semanticsearch/${encodedQuery}`;
+    const url = f"https://graph-rag.onrender.com//semanticsearch/{encoded_query}";
+
 
     // Set the headers
     const headers = {

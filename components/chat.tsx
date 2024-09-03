@@ -38,7 +38,7 @@ export function Chat({ id, className, session, missingKeys }: ChatProps) {
 
   useEffect(() => {
     const messagesLength = aiState.messages?.length
-    if (messagesLength === 1) {
+    if (messagesLength === 2) {
       router.refresh()
     }
   }, [aiState.messages, router])
