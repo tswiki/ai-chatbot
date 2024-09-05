@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { semantic_search } from '../augmented_query';
+import { interactiveSession } from '../augmented_query';
 
 import {
   createAI,
@@ -25,7 +25,6 @@ import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
 
 
-
 function isChat(obj: any): obj is Chat {
   return (
     typeof obj === 'object' &&
@@ -40,9 +39,11 @@ function isChat(obj: any): obj is Chat {
   );
 }
 
-async function processMessage(content: string): Promise<string | undefined> {
+async function processMessage(session_id: string, content: string): Promise<string | undefined> {
+  
   try {
-    const index = await semantic_search(content);
+    
+    const index = await interactiveSession(session_id, content);
 
     // If index is an object, convert it to a string format that makes sense.
     let indexString = '';
@@ -52,7 +53,7 @@ async function processMessage(content: string): Promise<string | undefined> {
       indexString = String(index); // Ensure index is a string
     }
 
-    const text = `Answer this query: '${content}' using this information: '${indexString}' to augment generated output and make it as accurate and factual as possible`;
+    const text = `Answer this query: '${content}' using this information: '${indexString}' as the only source of context and knowledge. Do not generate any additional information if provided context is inadequate; instead, return a friendly message explaining that the user's request is currently not suitable for processing due to limited or insufficient context available. Please provide more specific information or try a different query.`;
 
     return text;
   } catch (error) {
@@ -86,9 +87,10 @@ async function submitUserMessage(content: string) {
     aiState.get().messages.map(async (message: any) => {
       
       let processedContent = message.content;
+      const session = await auth();
 
-      if (message.role === 'user') {
-        const result = await processMessage(message.content);
+      if (message.role === 'user' && session?.user?.id) {
+        const result = await processMessage(session.user.id, message.content);
         processedContent = result || message.content; // Fallback to original content if processing fails
       }
 
