@@ -53,7 +53,7 @@ async function processMessage(session_id: string, content: string): Promise<stri
       indexString = String(index); // Ensure index is a string
     }
 
-    const text = `Answer this query: '${content}' using this information: '${indexString}' as the only source of context and knowledge. Do not generate any additional information if provided context is inadequate; instead, return a friendly message explaining that the user's request is currently not suitable for processing due to limited or insufficient context available. Please provide more specific information or try a different query.`;
+    const text = `Answer this query: '${content}' using this information: '${indexString}' as the only source of context and knowledge. Do not generate any additional information if provided context is inadequate; instead, return a friendly message explaining that the user's request cannot currently be processed due to limited or insufficient training or contextual information available. Please provide more specific information or try a different query.`;
 
     return text;
   } catch (error) {
@@ -91,7 +91,12 @@ async function submitUserMessage(content: string) {
 
       if (message.role === 'user' && session?.user?.id) {
         const result = await processMessage(session.user.id, message.content);
-        processedContent = result || message.content; // Fallback to original content if processing fails
+        processedContent = result //|| message.content; // Fallback to original content if processing fails
+      }
+
+      if (message.role === 'user' && !session?.user?.id) {
+        const result = await processMessage(crypto.randomUUID(), message.content);
+        processedContent = result //|| message.content; // Fallback to original content if processing fails
       }
 
       // Ensure that any object content is stringified properly
@@ -111,9 +116,12 @@ async function submitUserMessage(content: string) {
     model: openai('gpt-4o'),
     initial: <SpinnerMessage />,
     system: `
-You are a creator economy data instrumentation assistant that has the primary function of helping users achieve their goals and solve their problems by providing concise, accurate, and data-backed information that is provided in an easy-to-understand and iterate-on format.
-
-Any information generated should be limited to a maximum of 5 distinct (actionable) points (insights) to prevent analysis paralysis and ensure that the information is provided in efficient, understandable, and digestible chunks to maximize the user's learnability and instrumentation potential.
+    You are a creator economy data instrumentation assistant that has the primary
+    function of helping users achieve their goals and solve their problems by providing concise, accurate, 
+    and data-backed information that is provided in an easy-to-understand and iterate-on format.
+    Any information generated should be limited to a maximum of 5 distinct (actionable) points (insights)
+    to prevent analysis paralysis and ensure that the information is provided in efficient, understandable, 
+    and digestible chunks to maximize the user's learnability and instrumentation potential.
     `,
     messages: processedMessages,
     text: ({ content, done, delta }) => {
