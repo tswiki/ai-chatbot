@@ -91,12 +91,12 @@ async function submitUserMessage(content: string) {
 
       if (message.role === 'user' && session?.user?.id) {
         const result = await processMessage(session.user.id, message.content);
-        processedContent = result //|| message.content; // Fallback to original content if processing fails
+        processedContent = result || message.content; // Fallback to original content if processing fails
       }
 
       if (message.role === 'user' && !session?.user?.id) {
         const result = await processMessage(crypto.randomUUID(), message.content);
-        processedContent = result //|| message.content; // Fallback to original content if processing fails
+        processedContent = result || message.content; // Fallback to original content if processing fails
       }
 
       // Ensure that any object content is stringified properly

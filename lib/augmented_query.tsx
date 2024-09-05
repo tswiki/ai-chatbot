@@ -40,7 +40,8 @@ const isValidUUID = (value: string): string => {
  * Function to make a POST request to the FastAPI endpoint.
  * If the session_id is invalid, a new random UUID is generated.
  */
-export const interactiveSession = async (sessionId: string, query: string): Promise<void> => {
+
+export const interactiveSession = async (sessionId: string, query: string): Promise<any> => {
   // Validate or generate a new UUID
   const validSessionId = isValidUUID(sessionId);
 
@@ -67,14 +68,18 @@ export const interactiveSession = async (sessionId: string, query: string): Prom
     if (response.ok) {
       const data = await response.json();
       logDebug(`Response from API: ${JSON.stringify(data)}`);
+      return data; // Return the successful response data
     } else {
       const errorText = await response.text();
       logError(`Failed to get response. Status code: ${response.status}, Error: ${errorText}`);
+      return null; // Return null or throw an error to indicate failure
     }
   } catch (error) {
     logError(`An error occurred while making the request: ${error}`);
+    return null; // Return null or throw an error to indicate an unexpected error
   }
 };
+
 
 // Example usage in a Next.js app component or page
 // import { useEffect } from 'react';
