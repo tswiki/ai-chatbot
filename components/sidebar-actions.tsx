@@ -95,7 +95,7 @@ export function SidebarActions({
               disabled={isRemovePending}
               onClick={event => {
                 event.preventDefault()
-                // @ts-ignore
+                
                 startRemoveTransition(async () => {
                   const result = await removeChat({
                     id: chat.id,

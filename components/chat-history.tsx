@@ -41,7 +41,6 @@ export async function ChatHistory({ userId }: ChatHistoryProps) {
           </div>
         }
       >
-        {/* @ts-ignore */}
         <SidebarList userId={userId} />
       </React.Suspense>
     </div>

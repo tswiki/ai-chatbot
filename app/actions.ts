@@ -26,7 +26,7 @@ export async function getChats(userId?: string | null) {
 
     return results as Chat[]
   } catch (error) {
-    return []
+    console.error('An error occurred:', error);
   }
 }
 

@@ -5,7 +5,7 @@
 * @see https://v0.dev/t/ZLFXHSpPSGg
 * Documentation: https://v0.dev/docs#integrating-generated-code-into-your-nextjs-app
 */
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardContent} from "@/components/ui/card"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 //import { useState } from "react"
@@ -84,7 +84,7 @@ export function AboutSection() {
   )
 }
 
-function CalendarIcon(props: any) {
+function CalendarIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}
@@ -105,6 +105,7 @@ function CalendarIcon(props: any) {
     </svg>
   )
 }
+
 function EyeIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg

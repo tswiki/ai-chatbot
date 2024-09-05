@@ -335,7 +335,7 @@ export function channel_info() {
   )
 }
 
-function BotIcon(props: any) {
+function BotIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}
@@ -360,7 +360,7 @@ function BotIcon(props: any) {
 }
 
 
-function ClockIcon(props: any) {
+function ClockIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}
@@ -381,7 +381,7 @@ function ClockIcon(props: any) {
 }
 
 
-function EyeIcon(props: any) {
+function EyeIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}
@@ -402,7 +402,7 @@ function EyeIcon(props: any) {
 }
 
 
-function SearchIcon(props: any) {
+function SearchIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}
@@ -423,7 +423,7 @@ function SearchIcon(props: any) {
 }
 
 
-function UserIcon(props: any) {
+function UserIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}

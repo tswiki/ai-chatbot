@@ -7,9 +7,13 @@ export interface useCopyToClipboardProps {
 }
 
 export function useCopyToClipboard({
+
   timeout = 2000
+
 }: useCopyToClipboardProps) {
-  const [isCopied, setIsCopied] = React.useState<Boolean>(false)
+  
+  // Use the primitive boolean type instead of Boolean
+  const [isCopied, setIsCopied] = React.useState<boolean>(false)
 
   const copyToClipboard = (value: string) => {
     if (typeof window === 'undefined' || !navigator.clipboard?.writeText) {

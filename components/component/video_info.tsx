@@ -56,8 +56,8 @@ export function video_info() {
               </Link>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground grid grid-cols-2 gap-4">
-            <div className="flex justify-center items-center gap-1">
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex justify-center items-center gap-1">
               <EyeIcon className="w-4 h-4 mr-1" />
               320K views
             </div>
