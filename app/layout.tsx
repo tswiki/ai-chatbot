@@ -9,6 +9,9 @@ import { Header } from '@/components/header'
 import { Toaster } from '@/components/ui/sonner'
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/react"
+import Hotjar from '@hotjar/browser';
+
+
 
 export const metadata = {
   metadataBase: process.env.VERCEL_URL
@@ -38,6 +41,11 @@ interface RootLayoutProps {
 }
 
 export default function RootLayout({ children }: RootLayoutProps) {
+  
+  const siteId = 5126157;
+  const hotjarVersion = 6;
+  Hotjar.init(siteId, hotjarVersion);
+  
   return (
     <html lang="en" suppressHydrationWarning>
       <body

@@ -67,7 +67,7 @@ export async function Header() {
           target="_blank"
           className={cn(buttonVariants())}
         >
-          <span className="hidden sm:block">Join Wait list</span>
+          <span className="hidden sm:block">Join Wait-list</span>
           <span className="sm:hidden"><img
           src="/favicon.ico"
           className="hidden size-6 mr- dark:block"
