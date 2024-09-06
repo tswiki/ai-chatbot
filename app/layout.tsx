@@ -9,6 +9,7 @@ import { Header } from '@/components/header'
 import { Toaster } from '@/components/ui/sonner'
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/react"
+import HotjarSnippet from '@/lib/hotjar'
 
 
 
@@ -66,6 +67,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         </Providers>
         <Analytics />
         <SpeedInsights />
+        <HotjarSnippet/>
 
       </body>
     </html>
