@@ -63,8 +63,8 @@ export async function Header() {
       <div className="flex items-center justify-end">
       
         <a
-          //href=""
-          //target=""
+          href="https://tally.so/r/mBD7K4"
+          target="_blank"
           className={cn(buttonVariants())}
         >
           <span className="hidden sm:block">Creators' Library</span>
