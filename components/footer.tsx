@@ -11,7 +11,7 @@ export function FooterText({ className, ...props }: React.ComponentProps<'p'>) {
       )}
       {...props}
     >
-      AI RAGbot built by REVITALISE.IO
+      Powered by REVITALISE.IO
     </p>
   )
 }

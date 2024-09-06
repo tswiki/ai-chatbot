@@ -18,7 +18,7 @@ export const metadata = {
     default: 'Creators\' Library',
     template: `%s`
   },
-  description: 'An AI-powered RAGbot built by REVITALISE.IO',
+  description: 'Creators\' Library',
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon-32x32.png',
