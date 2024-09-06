@@ -16,7 +16,7 @@ export const metadata = {
     : undefined,
   title: {
     default: 'Creators\' Library',
-    template: `%s`
+    template: `%s Creators\' Library`
   },
   description: 'Creators\' Library',
   icons: {
