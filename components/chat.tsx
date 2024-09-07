@@ -37,7 +37,7 @@ export function Chat({ id, className, session, missingKeys }: ChatProps) {
   }, [id, path, session?.user, messages])
 
   useEffect(() => {
-    const messagesLength = aiState.messages?.length
+    const messagesLength = aiState.messages?.length ?? 0
     if (messagesLength === 2) {
       router.refresh()
     }
@@ -65,7 +65,7 @@ export function Chat({ id, className, session, missingKeys }: ChatProps) {
         className={cn('pb-[200px] pt-4 md:pt-10', className)}
         ref={messagesRef}
       >
-        {messages.length ? (
+        {messages && messages.length ? (
           <ChatList messages={messages} isShared={false} session={session} />
         ) : (
           <EmptyScreen />

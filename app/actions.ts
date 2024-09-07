@@ -9,6 +9,7 @@ import { type Chat } from '@/lib/types'
 
 export async function getChats(userId?: string | null) {
   if (!userId) {
+    console.log('No userId provided');
     return []
   }
 
@@ -18,11 +19,29 @@ export async function getChats(userId?: string | null) {
       rev: true
     })
 
+    console.log(`Found ${chats.length} chats for user ${userId}`);
+
+    if (chats.length === 0) {
+      console.log('No chats found, returning default chat');
+      return [{
+        id: 'default',
+        title: 'Welcome',
+        createdAt: new Date().toISOString(),
+        userId: userId,
+        path: '/chat/default'
+      }];
+    }
+
     for (const chat of chats) {
       pipeline.hgetall(chat)
     }
 
     const results = await pipeline.exec()
+
+    if (!results || results.length === 0) {
+      console.log('Pipeline execution returned no results');
+      return [];
+    }
 
     return results as Chat[]
   } catch (error) {
