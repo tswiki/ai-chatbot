@@ -42,7 +42,7 @@ export default async function ChatPage({ params }: ChatPageProps) {
   if (!chat || 'error' in chat) {
     redirect('/')
   }
-  else{
+  else{    
   if (chat?.userId !== session?.user?.id) {
     notFound()
   }

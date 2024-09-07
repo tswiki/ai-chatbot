@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Textarea from 'react-textarea-autosize'
 import { useActions, useUIState } from 'ai/rsc'
-import { UserMessage } from './stocks/message'
+import { SystemMessage, UserMessage } from './stocks/message'
 import { type AI } from '@/lib/chat/actions'
 import { Button } from '@/components/ui/button'
 import { IconArrowElbow, IconPlus } from '@/components/ui/icons'
@@ -51,34 +51,49 @@ export function PromptForm({
         const value = input.trim()
         setInput('')
         if (!value) return
+       
+        async function submitMessageWithRetry(value: string, maxRetries = 3) {
+          for (let i = 0; i < maxRetries; i++) {
+            try {
+              return await submitUserMessage(value);
+            } catch (error) {
+              if (i === maxRetries - 1) throw error;
+              await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+            }
+          }
+        }
 
-        // Optimistically add user message UI
-        setMessages((currentMessages: any) => [
+        try {
+          const responseMessage = await submitMessageWithRetry(value);
+          setMessages((currentMessages: any) => [...currentMessages, responseMessage]);
+        } catch (error: any) {
+          {
+            console.error('Error submitting message:', error);
+            
+            let errorMessage = 'An error occurred. Please try again later.';
+            if (error.message && error.message.includes('Pipeline is empty')) {
+            errorMessage = 'The AI system is currently unavailable. Please try again in a few minutes.';
+            } else if (error.name === 'NetworkError' || !navigator.onLine) {
+            errorMessage = 'Network error. Please check your internet connection and try again.';
+          }
+            
+           toast(
+            <div className="text-red-600">
+            {errorMessage}
+            </div>
+          );
+          // Optimistically add user message UI
+          setMessages((currentMessages: any) => [
           ...currentMessages,
           {
             id: nanoid(),
-            display: <UserMessage>{value}</UserMessage>
+            display: <SystemMessage>{errorMessage}</SystemMessage>
           }
-        ])
-        
-        try {
-
-          // Perform semantic search
-          //await submitUserMessage(`semantic_search("${value}")`);
-      
-          // Submit and get response message
-          const responseMessage = await submitUserMessage(value);
-          setMessages((currentMessages: any) => [...currentMessages, responseMessage]);
-        } catch (error) {
-          // Handle error
-          toast(
-            <div className="text-red-600">
-              An error occurred. Please try again later.
-            </div>
-          );
+        ]);
         }
-      
-      }}
+      }
+    }
+  }
     >
       <div className="relative flex max-h-60 w-full grow flex-col overflow-hidden bg-background px-8 sm:rounded-md sm:border sm:px-12">
         <Tooltip>
