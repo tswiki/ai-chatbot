@@ -7,7 +7,7 @@ export type Message = CoreMessage & {
 export interface Chat extends Record<string, any> {
   id: string
   title: string
-  createdAt: Date
+  createdAt: Date | string
   userId: string
   path: string
   messages: Message[]
