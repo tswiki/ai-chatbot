@@ -12,8 +12,6 @@ import { Analytics } from "@vercel/analytics/react"
 import Script from 'next/script'
 
 
-
-
 export const metadata = {
   metadataBase: process.env.VERCEL_URL
     ? new URL(`https://${process.env.VERCEL_URL}`)
