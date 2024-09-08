@@ -4,6 +4,7 @@
 import { Message } from 'ai'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
+import { useTheme } from 'next-themes'
 
 import { cn } from '@/lib/utils'
 import { CodeBlock } from '@/components/ui/codeblock'
@@ -15,6 +16,9 @@ export interface ChatMessageProps {
 }
 
 export function ChatMessage({ message, ...props }: ChatMessageProps) {
+  
+  const { theme } = useTheme()
+  
   return (
     <div
       className={cn('group relative mb-4 flex items-start md:-ml-12')}
@@ -23,22 +27,22 @@ export function ChatMessage({ message, ...props }: ChatMessageProps) {
       <div
         className={cn('flex size-8 shrink-0 select-none items-center justify-center rounded-md border shadow',
           message.role === 'user'
-            ? "flex items-center justify-center rounded-full border-2 border-white-500 bg-white p-1 shadow-sm"
-            : "flex items-center justify-center rounded-full border-2 border-white p-1"
+            ? `flex items-center justify-center rounded-full border-2 ${theme === 'dark' ? 'border-white' : 'border-black'} bg-white p-1 shadow-sm`
+            : `flex items-center justify-center rounded-full border-2 ${theme === 'dark' ? 'border-black' : 'border-white'} p-1`
         )}
       >
         {message.role === 'user' ? <img
-    src="/user/favicon.ico"
-    width={25}
-    height={25}
-    style={{ display: 'block', margin: 'auto'  }}
-  /> : <img
-  src="/inverted/favicon.ico"
-  className="size-6"
-  width={48} // Adjust the width as needed
-  height={48} // Adjust the height as needed
-  style={{ display: 'block', margin: 'auto' }} // Ensures the image is centered
-/>}
+          src="/user/favicon.ico"
+          width={25}
+          height={25}
+          style={{ display: 'block', margin: 'auto'  }}
+        /> : <img
+            src={theme === 'dark' ? "/inverted/favicon.ico" : "/favicon.ico"}
+            className="size-6"
+            width={48} // Adjust the width as needed
+            height={48} // Adjust the height as needed
+            style={{ display: 'block', margin: 'auto' }} // Ensures the image is centered
+      />}
       </div>
       <div className="flex-1 px-1 ml-4 space-y-2 overflow-hidden">
         <MemoizedReactMarkdown
