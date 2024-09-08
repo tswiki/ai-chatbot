@@ -13,10 +13,20 @@ interface SidebarListProps {
 }
 
 const loadChats = cache(async (userId?: string) => {
-  return await getChats(userId)
+
+  const chats = await getChats(userId)
+  if (chats && !('error' in chats)) {
+    return chats.map(chat => ({
+      ...chat,
+      createdAt: new Date(chat.createdAt)
+    })) as Chat[]
+  }
+  return chats
+  
 })
 
 export async function SidebarList({ userId }: SidebarListProps) {
+  
   const chats = await loadChats(userId)
 
   if (!chats || 'error' in chats) {

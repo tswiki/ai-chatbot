@@ -70,9 +70,13 @@ export function ChatShareDialog({
                 const result = await shareChat(chat.id)
 
                 if (result && 'error' in result) {
-                  toast.error(result.error)
+                  if (typeof result.error === 'string') {
+                    toast.error(result.error)
+                  } else {
+                    console.error('Unexpected error format:', result.error)
+                  }
                   return
-                }
+                }             
 
                 copyShareLink(result)
               })

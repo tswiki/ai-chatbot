@@ -42,6 +42,16 @@ export function formatDate(input: string | number | Date): string {
   })
 }
 
+// When saving
+export function dateToString(date: Date): string {
+  return date.toISOString();
+}
+
+// When retrieving
+export function stringToDate(dateString: string): Date {
+  return new Date(dateString);
+}
+
 export const formatNumber = (value: number) =>
   new Intl.NumberFormat('en-US', {
     style: 'currency',

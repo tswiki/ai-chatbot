@@ -13,7 +13,7 @@ import {
 
 import { openai } from '@ai-sdk/openai';
 
-import { BotMessage } from '@/components/stocks';
+import { BotMessage, SystemMessage } from '@/components/stocks';
 import { z } from 'zod';
 import { tool } from 'ai';
 
@@ -23,6 +23,8 @@ import { saveChat } from '@/app/actions';
 import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
+
+
 
 
 function isChat(obj: any): obj is Chat {
@@ -85,21 +87,15 @@ async function submitUserMessage(content: string) {
   // Process messages before passing them to streamUI
   const processedMessages = await Promise.all(
     aiState.get().messages.map(async (message: any) => {
-      
       let processedContent = message.content;
       const session = await auth();
 
-      if (message.role === 'user' && session?.user?.id) {
-        const result = await processMessage(session.user.id, message.content);
-        processedContent = result || message.content; // Fallback to original content if processing fails
+      if (message.role === 'user') {
+        const sessionId = session?.user?.id || crypto.randomUUID();
+        const result = await processMessage(sessionId, message.content);
+        processedContent = result || message.content;
       }
 
-      if (message.role === 'user' && !session?.user?.id) {
-        const result = await processMessage(crypto.randomUUID(), message.content);
-        processedContent = result || message.content; // Fallback to original content if processing fails
-      }
-
-      // Ensure that any object content is stringified properly
       if (typeof processedContent === 'object') {
         processedContent = JSON.stringify(processedContent, null, 2);
       }
@@ -112,50 +108,75 @@ async function submitUserMessage(content: string) {
     })
   );
 
-  const result = await streamUI({
-    model: openai('gpt-4o'),
-    initial: <SpinnerMessage />,
-    system: `
-    You are a creator economy data instrumentation assistant that has the primary
-    function of helping users achieve their goals and solve their problems by providing concise, accurate, 
-    and data-backed information that is provided in an easy-to-understand and iterate-on format.
-    Any information generated should be limited to a maximum of 5 distinct (actionable) points (insights)
-    to prevent analysis paralysis and ensure that the information is provided in efficient, understandable, 
-    and digestible chunks to maximize the user's learnability and instrumentation potential.
-    `,
-    messages: processedMessages,
-    text: ({ content, done, delta }) => {
-      if (!textStream) {
-        textStream = createStreamableValue('');
-        textNode = <BotMessage content={textStream.value} />;
+  const maxRetries = 3;
+  let retries = 0;
+
+  while (retries < maxRetries) {
+    try {
+      const result = await streamUI({
+        model: openai('gpt-4o'),  // Changed from 'gpt-4o' to 'gpt-4'
+        initial: <SpinnerMessage />,
+        system: `
+        You are a creator economy data instrumentation assistant that has the primary
+        function of helping users achieve their goals and solve their problems by providing concise, accurate, 
+        and data-backed information that is provided in an easy-to-understand and iterate-on format.
+        Any information generated should be limited to a maximum of 5 distinct (actionable) points (insights)
+        to prevent analysis paralysis and ensure that the information is provided in efficient, understandable, 
+        and digestible chunks to maximize the user's learnability and instrumentation potential.
+        `,
+        messages: processedMessages,
+        text: ({ content, done, delta }) => {
+          if (!textStream) {
+            textStream = createStreamableValue('');
+            textNode = <BotMessage content={textStream.value} />;
+          }
+
+          if (done) {
+            textStream.done();
+            aiState.update({
+              ...aiState.get(),
+              messages: [
+                ...aiState.get().messages,
+                {
+                  id: nanoid(),
+                  role: 'assistant',
+                  content,
+                },
+              ],
+            });
+          } else {
+            textStream.update(delta);
+          }
+
+          return textNode;
+        },
+      });
+
+      return {
+        id: nanoid(),
+        display: result.value,
+      };
+    } catch (error: any) {
+      console.error(`Attempt ${retries + 1} failed:`, error);
+      retries++;
+      if (retries === maxRetries) {
+        console.error('Max retries reached. Returning error message.');
+        let errorMessage = 'An error occurred. Please try again later.';
+        if (error.message && error.message.includes('Pipeline is empty')) {
+          errorMessage = 'The AI system is currently unavailable. Please try again in a few minutes.';
+        } else if (error.name === 'NetworkError' || !navigator.onLine) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
+        }
+        return {
+          id: nanoid(),
+          display: <SystemMessage>{errorMessage}</SystemMessage>,
+        };
       }
-
-      if (done) {
-        textStream.done();
-        aiState.update({
-          ...aiState.get(),
-          messages: [
-            ...aiState.get().messages,
-            {
-              id: nanoid(),
-              role: 'assistant',
-              content,
-            },
-          ],
-        });
-      } else {
-        textStream.update(delta);
-      }
-
-      return textNode;
-    },
-  });
-
-  return {
-    id: nanoid(),
-    display: result.value,
-  };
+      await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // Exponential backoff
+    }
+  }
 }
+
 
 
 export type AIState = {
@@ -192,6 +213,7 @@ export const AI = createAI<AIState, UIState>({
       return;
     }
   },
+
   onSetAIState: async ({ state }) => {
     'use server';
 

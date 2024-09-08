@@ -5,49 +5,68 @@ import { redirect } from 'next/navigation'
 import { kv } from '@vercel/kv'
 
 import { auth } from '@/auth'
-import { type Chat } from '@/lib/types'
+import { Chat, Message } from '@/lib/types'
 
-export async function getChats(userId?: string | null) {
+
+export async function getChats(userId?: string | null): Promise<Chat[] | { error: string }> {
   if (!userId) {
     console.log('No userId provided');
-    return []
+    return { error: 'No userId provided' };
   }
 
   try {
-    const pipeline = kv.pipeline()
+    const pipeline = kv.pipeline();
     const chats: string[] = await kv.zrange(`user:chat:${userId}`, 0, -1, {
       rev: true
-    })
+    });
 
     console.log(`Found ${chats.length} chats for user ${userId}`);
 
     if (chats.length === 0) {
-      console.log('No chats found, returning default chat');
-      return [{
-        id: 'default',
-        title: 'Welcome',
-        createdAt: new Date().toISOString(),
-        userId: userId,
-        path: '/chat/default'
-      }];
-    }
-
-    for (const chat of chats) {
-      pipeline.hgetall(chat)
-    }
-
-    const results = await pipeline.exec()
-
-    if (!results || results.length === 0) {
-      console.log('Pipeline execution returned no results');
       return [];
     }
 
-    return results as Chat[]
+    for (const chat of chats) {
+      pipeline.hgetall(chat);
+    }
+
+    const results = await pipeline.exec();
+
+    if (!results || results.length === 0) {
+      console.log('Pipeline execution returned no results');
+      return { error: 'No results found' };
+    }
+
+    return results.map(chat => {
+      if (typeof chat === 'object' && chat !== null) {
+        return {
+          id: (chat as any).id || '',
+          title: (chat as any).title || '',
+          createdAt: new Date((chat as any).createdAt || Date.now()),
+          userId: (chat as any).userId || '',
+          path: (chat as any).path || '',
+          messages: Array.isArray((chat as any).messages) ? (chat as any).messages : [],
+          sharePath: (chat as any).sharePath
+        } as Chat;
+      }
+      // If chat is not an object, return a default Chat object
+      return {
+        id: '',
+        title: '',
+        createdAt: new Date(),
+        userId: '',
+        path: '',
+        messages: [],
+        sharePath: undefined
+      } as Chat;
+    });
+
   } catch (error) {
     console.error('An error occurred:', error);
+    return { error: 'An error occurred while fetching chats' };
   }
 }
+
 
 export async function getChat(id: string, userId: string) {
   const chat = await kv.hgetall<Chat>(`chat:${id}`)
@@ -129,28 +148,49 @@ export async function shareChat(id: string) {
     }
   }
 
-  const chat = await kv.hgetall<Chat>(`chat:${id}`)
+  const chatData = await kv.hgetall<Chat>(`chat:${id}`)
 
-  if (!chat || chat.userId !== session.user.id) {
+  if (!chatData || chatData.userId !== session.user.id) {
     return {
       error: 'Something went wrong'
     }
   }
+
+  // Convert the chatData to a proper Chat object
+  const chat: Chat = {
+    ...chatData,
+    createdAt: new Date(chatData.createdAt),
+    messages: Array.isArray(chatData.messages)
+    ? chatData.messages
+    : JSON.parse(chatData.messages as unknown as string) as Message[]  }
 
   const payload = {
     ...chat,
     sharePath: `/share/${chat.id}`
   }
 
-  await kv.hmset(`chat:${chat.id}`, payload)
+  await kv.hmset(`chat:${chat.id}`, {
+    ...payload,
+    createdAt: payload.createdAt.toISOString(),
+    messages: JSON.stringify(payload.messages)
+  })
 
   return payload
+}
+
+function isValidChat(chat: Chat): boolean {
+  return chat.id !== undefined && chat.title !== undefined && chat.userId !== undefined && chat.createdAt !== undefined && chat.path !== undefined;
 }
 
 export async function saveChat(chat: Chat) {
   const session = await auth()
 
   if (session && session.user) {
+    if (!isValidChat(chat)) {
+      console.error('Invalid chat object:', chat);
+      return;
+    }
+
     const pipeline = kv.pipeline()
     pipeline.hmset(`chat:${chat.id}`, chat)
     pipeline.zadd(`user:chat:${chat.userId}`, {
@@ -162,6 +202,7 @@ export async function saveChat(chat: Chat) {
     return
   }
 }
+
 
 export async function refreshHistory(path: string) {
   redirect(path)
