@@ -1,6 +1,3 @@
-// Inspired by Chatbot-UI and modified to fit the needs of this project
-// @see https://github.com/mckaywrigley/chatbot-ui/blob/main/components/Chat/ChatMessage.tsx
-
 import { Message } from 'ai'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -16,7 +13,6 @@ export interface ChatMessageProps {
 }
 
 export function ChatMessage({ message, ...props }: ChatMessageProps) {
-  
   const { theme } = useTheme()
   
   return (
@@ -39,9 +35,9 @@ export function ChatMessage({ message, ...props }: ChatMessageProps) {
         /> : <img
             src={theme === 'dark' ? "/inverted/favicon.ico" : "/favicon.ico"}
             className="size-6"
-            width={48} // Adjust the width as needed
-            height={48} // Adjust the height as needed
-            style={{ display: 'block', margin: 'auto' }} // Ensures the image is centered
+            width={48}
+            height={48}
+            style={{ display: 'block', margin: 'auto' }}
       />}
       </div>
       <div className="flex-1 px-1 ml-4 space-y-2 overflow-hidden">
