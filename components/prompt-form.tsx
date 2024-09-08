@@ -51,6 +51,14 @@ export function PromptForm({
         const value = input.trim()
         setInput('')
         if (!value) return
+
+        setMessages((currentMessages: any) => [
+          ...currentMessages,
+          {
+            id: nanoid(),
+            display: <UserMessage>{value}</UserMessage>
+          }
+        ]);
        
         async function submitMessageWithRetry(value: string, maxRetries = 3) {
           for (let i = 0; i < maxRetries; i++) {
