@@ -1,6 +1,4 @@
 
-import { v4 as uuidv4, validate as uuidValidate, version as uuidVersion } from 'uuid';
-
 // Logging function for debugging purposes
 const logDebug = (message: string) => {
   console.debug(`${new Date().toISOString()} - DEBUG - ${message}`);
@@ -10,31 +8,7 @@ const logError = (message: string) => {
   console.error(`${new Date().toISOString()} - ERROR - ${message}`);
 };
 
-/**
- * Function to check if a given value is a valid UUID.
- * If the value is invalid, a new random UUID is generated and returned.
- */
-const isValidUUID = (value: string): string => {
-  try {
-    // Ensure the value is a string before attempting to validate it
-    if (typeof value !== 'string') {
-      value = String(value);
-    }
 
-    // Validate the UUID and check its version
-    if (uuidValidate(value) && uuidVersion(value) === 4) {
-      logDebug(`Valid UUID provided: ${value}`);
-      return value;  // Return the valid UUID as a string
-    } else {
-      throw new Error('Invalid UUID');
-    }
-  } catch (error) {
-    // If an error is raised, it means the value is not a valid UUID
-    const newUUID = uuidv4();  // Generate a new random UUID
-    logDebug(`Invalid UUID detected. Generated new UUID: ${newUUID}`);
-    return newUUID;  // Return the new UUID as a string
-  }
-};
 
 /**
  * Function to make a POST request to the FastAPI endpoint.
@@ -43,7 +17,7 @@ const isValidUUID = (value: string): string => {
 
 export const interactiveSession = async (sessionId: string, query: string): Promise<any> => {
   // Validate or generate a new UUID
-  const validSessionId = isValidUUID(sessionId);
+  const validSessionId: string = String(sessionId);
 
   // Define the endpoint URL
   const url = 'https://agentic-rag-m21c.onrender.com/interactive-session';
