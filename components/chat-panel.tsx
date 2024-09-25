@@ -38,7 +38,7 @@ export function ChatPanel({
     {
       heading: 'Growth Operating',
       subheading: 'Growth Operating Strategy',
-      message: `Reference Pierre's growth operating strategy to create a framework that will guide a user on how they should approach growth operating to achieve similar results.`
+      message: `Current best growth operating strategy to follow to achieve similar results as Pierre Khoury.`
     },
     {
       heading: 'Appointment Setting',
