@@ -45,6 +45,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
   
   return (
     <html lang="en" suppressHydrationWarning>
+      <CSPostHogProvider>
+        <body>{children}</body>
+      </CSPostHogProvider>
       <body
         className={cn(
           'font-sans antialiased',
@@ -67,10 +70,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         </Providers>
         <Analytics />
         <SpeedInsights />
-        <CSPostHogProvider>
-        <body>{children}</body>
-      </CSPostHogProvider>
-
+        
       </body>
     </html>
   )
