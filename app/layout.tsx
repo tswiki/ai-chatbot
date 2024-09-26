@@ -47,7 +47,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <html lang="en" suppressHydrationWarning>
         <CSPostHogProvider>
         <body>{children}</body>
-        </CSPostHogProvider>
+      </CSPostHogProvider>
       <body
         className={cn(
           'font-sans antialiased',
