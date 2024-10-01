@@ -63,7 +63,7 @@ export async function Header() {
       <div className="flex items-center justify-end">
       
         <a
-          href="https://tally.so/r/mBD7K4"
+          href="https://forms.gle/PgoMnMJ7Hq1dppES7"
           target="_blank"
           className={cn(buttonVariants())}
         >
