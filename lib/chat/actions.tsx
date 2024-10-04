@@ -96,8 +96,8 @@ async function submitUserMessage(content: string) {
         **Tools and Usage Instructions:**  
         - Available tools: {tools}
         - You can use any of the following tools by their names: {tool_names}
-        - Utilize the "semantic search" tool to quickly find relevant information to generate an overview response.
-        - Use the "metadata query" tool for detailed creator metadata and context extraction.
+        - Utilize the "semantic search" tool to provide evidence for any information generated.
+        - Use the "metadata query" tool for detailed creator metadata and context extraction for richer prompts.
         - For long-running tasks (e.g., detailed script creation), keep the user updated on progress and estimated completion time.
 
         **Conversation Flow:**  
@@ -110,7 +110,7 @@ async function submitUserMessage(content: string) {
           {
             role: 'system',
             content: `
-              You have access to the tools 'interactiveSessionTool', 'semanticSearchTool', and 'metadataQueryTool' to fetch information. 
+              You have access to the tools 'semanticSearchTool', and 'metadataQueryTool' to fetch information. 
               Use them to generate responses based on real-time data from the backend.
             `,
           },
@@ -141,22 +141,6 @@ async function submitUserMessage(content: string) {
           return textNode;
         },
         tools: {
-          interactiveSessionTool: {
-            description: 'Interact with the WebSocket endpoint for complex data queries.',
-            parameters: z.object({
-              session_id: z.string().describe('The session ID for the WebSocket connection.'),
-              query: z.string().describe('The user query to send to the WebSocket endpoint.'),
-            }),
-            generate: async ({ session_id, query }: { session_id: string; query: string }) => {
-              try {
-                const result = await interactiveSession(session_id, query);
-                return <BotMessage content={`Response: ${JSON.stringify(result)}`} />;
-              } catch (error) {
-                console.error('WebSocket interaction failed:', error);
-                return <SystemMessage>Error: Could not process the WebSocket request.</SystemMessage>;
-              }
-            },
-          },
           semanticSearchTool: {
             description: 'Perform a semantic search to augment content with relevant information.',
             parameters: z.object({
@@ -265,22 +249,6 @@ export const AI = createAI<AIState, UIState>({
     }
   },
   tools: {
-    interactiveSessionTool: {
-      description: 'Interact with the WebSocket endpoint for complex data queries.',
-      parameters: z.object({
-        session_id: z.string().describe('The session ID for the WebSocket connection.'),
-        query: z.string().describe('The user query to send to the WebSocket endpoint.'),
-      }),
-      generate: async ({ session_id, query }: { session_id: string; query: string }) => {
-        try {
-          const result = await interactiveSession(session_id, query);
-          return <BotMessage content={`Response: ${JSON.stringify(result)}`} />;
-        } catch (error) {
-          console.error('WebSocket interaction failed:', error);
-          return <SystemMessage>Error: Could not process the WebSocket request.</SystemMessage>;
-        }
-      },
-    },
     semanticSearchTool: {
       description: 'Perform a semantic search to augment content with relevant information.',
       parameters: z.object({
@@ -300,6 +268,7 @@ export const AI = createAI<AIState, UIState>({
       },
     },
   },
+  
 } as CreateAIOptions);
 
 export const getUIStateFromAIState = (aiState: Chat) => {
