@@ -1,5 +1,4 @@
 
-
 import 'server-only';
 
 import { createAI, createStreamableUI, getMutableAIState, getAIState, streamUI, createStreamableValue } from 'ai/rsc';
@@ -33,38 +32,52 @@ interface AIActions<AIStateType, UIStateType> {
 // Define CustomAIConfig interface that extends AIActions
 type CustomAIConfig = AIActions<AIState, UIState>;
 
-// Function to handle HTTP-based API requests
-async function httpApiRequest(endpoint: string, payload: object): Promise<string> {
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+// Function to handle HTTP-based API requests with retry mechanism
+async function httpApiRequest(endpoint: string, payload: object, retries = 3): Promise<string> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
 
-    const data = await response.json();
-    if (data.response) {
-      return data.response;
-    } else if (data.error) {
-      throw new Error(data.error);
-    }
+      clearTimeout(timeoutId);
 
-    throw new Error('Unexpected response format');
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`HTTP request failed: ${error.message}`);
-    } else {
-      throw new Error('HTTP request failed with an unknown error');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.response) {
+        return data.response;
+      } else if (data.error) {
+        throw new Error(data.error);
+      }
+
+      throw new Error('Unexpected response format');
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(`Attempt ${attempt} failed: ${error.message}`);
+        if (attempt === retries) {
+          throw new Error(`HTTP request failed after ${retries} attempts: ${error.message}`);
+        }
+      } else {
+        console.error(`Attempt ${attempt} failed with an unknown error`);
+        if (attempt === retries) {
+          throw new Error('HTTP request failed with an unknown error after maximum retries');
+        }
+      }
     }
   }
+  throw new Error('HTTP request failed after maximum retries');
 }
-
 
 // Semantic Search Tool using HTTP request
 async function semanticSearchTool(query: string) {
