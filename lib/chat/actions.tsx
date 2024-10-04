@@ -10,6 +10,7 @@ import { saveChat } from '@/app/actions';
 import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
+import axios from 'axios';
 
 // Define a generic action interface to satisfy the createAI constraint
 interface AIActions<AIStateType, UIStateType> {
@@ -36,34 +37,17 @@ type CustomAIConfig = AIActions<AIState, UIState>;
 async function httpApiRequest(endpoint: string, payload: object, retries = 3): Promise<string> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      console.log(`Attempt ${attempt}: Sending request to ${endpoint} with payload:`, payload);
+      const response = await axios.post(endpoint, payload, { timeout: 10000 }); // 10-second timeout
+      console.log(`Attempt ${attempt}: Received response:`, response.data);
+      if (response.data.response) {
+        return response.data.response;
+      } else if (response.data.error) {
+        throw new Error(response.data.error);
       }
-
-      const data = await response.json();
-      if (data.response) {
-        return data.response;
-      } else if (data.error) {
-        throw new Error(data.error);
-      }
-
       throw new Error('Unexpected response format');
     } catch (error) {
-      if (error instanceof Error) {
+      if (axios.isAxiosError(error)) {
         console.error(`Attempt ${attempt} failed: ${error.message}`);
         if (attempt === retries) {
           throw new Error(`HTTP request failed after ${retries} attempts: ${error.message}`);
@@ -81,8 +65,10 @@ async function httpApiRequest(endpoint: string, payload: object, retries = 3): P
 
 // Semantic Search Tool using HTTP request
 async function semanticSearchTool(query: string) {
+  console.log('semanticSearchTool: Starting semantic search with query:', query);
   try {
     const response = await httpApiRequest('https://your-http-endpoint.com/api/semantic-search', { query });
+    console.log('semanticSearchTool: Received response:', response);
     return <BotMessage content={`Semantic Search Results: ${response}`} />;
   } catch (error) {
     console.error('Semantic search failed:', error);
@@ -92,8 +78,10 @@ async function semanticSearchTool(query: string) {
 
 // Metadata Query Tool using HTTP request
 async function metadataQueryTool(query: string) {
+  console.log('metadataQueryTool: Starting metadata query with query:', query);
   try {
     const response = await httpApiRequest('https://your-http-endpoint.com/api/metadata-query', { query });
+    console.log('metadataQueryTool: Received response:', response);
     return <BotMessage content={`Metadata Query Results: ${response}`} />;
   } catch (error) {
     console.error('Metadata query failed:', error);
@@ -105,6 +93,7 @@ async function metadataQueryTool(query: string) {
 async function submitUserMessage(content: string) {
   'use server';
 
+  console.log('submitUserMessage: Received user message:', content);
   const aiState = getMutableAIState<typeof AI>();
 
   aiState.update({
@@ -123,6 +112,7 @@ async function submitUserMessage(content: string) {
   let textNode: undefined | React.ReactNode;
 
   try {
+    console.log('submitUserMessage: Streaming UI with user message.');
     const result = await streamUI({
       model: openai('gpt-4o'),
       initial: <SpinnerMessage />,
@@ -155,11 +145,13 @@ async function submitUserMessage(content: string) {
       ],
       text: ({ content, done, delta }) => {
         if (!textStream) {
+          console.log('submitUserMessage: Initializing text stream.');
           textStream = createStreamableValue('');
           textNode = <BotMessage content={textStream.value} />;
         }
 
         if (done) {
+          console.log('submitUserMessage: Stream done. Final content:', content);
           textStream.done();
           aiState.update({
             ...aiState.get(),
@@ -173,6 +165,7 @@ async function submitUserMessage(content: string) {
             ],
           });
         } else {
+          console.log('submitUserMessage: Updating text stream with delta:', delta);
           textStream.update(delta);
         }
 
@@ -185,6 +178,7 @@ async function submitUserMessage(content: string) {
             query: z.string().describe('The user query to perform semantic search.'),
           }),
           generate: async ({ query }: { query: string }) => {
+            console.log('submitUserMessage: Using semanticSearchTool with query:', query);
             return semanticSearchTool(query);
           },
         },
@@ -194,12 +188,14 @@ async function submitUserMessage(content: string) {
             query: z.string().describe('The query for executing metadata search.'),
           }),
           generate: async ({ query }: { query: string }) => {
+            console.log('submitUserMessage: Using metadataQueryTool with query:', query);
             return metadataQueryTool(query);
           },
         },
       },
     });
 
+    console.log('submitUserMessage: Successfully processed user message.');
     return {
       id: nanoid(),
       display: result.value,
@@ -239,6 +235,7 @@ export const AI = createAI<AIState, UIState>({
         query: z.string().describe('The user query to perform semantic search.'),
       }),
       generate: async ({ query }: { query: string }) => {
+        console.log('AI: Using semanticSearchTool with query:', query);
         return semanticSearchTool(query);
       },
     },
@@ -248,6 +245,7 @@ export const AI = createAI<AIState, UIState>({
         query: z.string().describe('The query for executing metadata search.'),
       }),
       generate: async ({ query }: { query: string }) => {
+        console.log('AI: Using metadataQueryTool with query:', query);
         return metadataQueryTool(query);
       },
     },
@@ -258,13 +256,16 @@ export const AI = createAI<AIState, UIState>({
   onGetUIState: async () => {
     'use server';
 
+    console.log('onGetUIState: Fetching UI state.');
     const session = await auth();
 
     if (session && session.user) {
       const aiState = getAIState() as Chat;
+      console.log('onGetUIState: Found AI state:', aiState);
 
       if (aiState) {
         const uiState = getUIStateFromAIState(aiState);
+        console.log('onGetUIState: Generated UI state:', uiState);
         return uiState;
       }
     }
@@ -273,6 +274,7 @@ export const AI = createAI<AIState, UIState>({
   onSetAIState: async ({ state }) => {
     'use server';
 
+    console.log('onSetAIState: Setting AI state with state:', state);
     const session = await auth();
 
     if (session && session.user) {
@@ -294,12 +296,14 @@ export const AI = createAI<AIState, UIState>({
         path,
       };
 
+      console.log('onSetAIState: Saving chat with details:', chat);
       await saveChat(chat);
     }
   },
 } as CustomAIConfig);
 
 export const getUIStateFromAIState = (aiState: Chat) => {
+  console.log('getUIStateFromAIState: Converting AI state to UI state for AI state:', aiState);
   return aiState.messages
     .filter((message) => message.role !== 'system')
     .map((message, index) => ({
