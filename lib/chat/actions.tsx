@@ -1,4 +1,5 @@
 import 'server-only';
+
 import { createAI, createStreamableUI, getMutableAIState, getAIState, streamUI, createStreamableValue } from 'ai/rsc';
 import { openai } from '@ai-sdk/openai';
 import { BotMessage, SystemMessage } from '@/components/stocks';
@@ -9,50 +10,13 @@ import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
 
-interface CreateAIOptions<AIStateType, UIStateType> {
-  actions: {
-    submitUserMessage: (content: string) => Promise<{ id: string; display: React.ReactNode }>;
-  };
-  initialAIState: AIStateType;
-  initialUIState: UIStateType;
-  onGetUIState: () => Promise<UIStateType | undefined>;
-  onSetAIState: ({ state }: { state: AIStateType }) => Promise<void>;
-  tools?: Record<string, any>;
-}
-
-async function semanticSearchTool(query: string) {
-  try {
-    const response = await fetch(`https://graph-rag-avde.onrender.com/semanticsearch/${encodeURIComponent(query)}`, {
-      headers: { 'Content-Type': 'application/json' },
-    });
-    const result = await response.json();
-    return <BotMessage content={`Semantic Search Results: ${JSON.stringify(result)}`} />;
-  } catch (error) {
-    console.error('Semantic search failed:', error);
-    return <SystemMessage>Error: Could not process the semantic search.</SystemMessage>;
-  }
-}
-
-async function executeMetadataQueryTool(query: string) {
-  try {
-    const response = await fetch(`https://metadata-rag.onrender.com/execute_metadata_query/${encodeURIComponent(query)}`, {
-      headers: { 'Content-Type': 'application/json' },
-    });
-    const result = await response.json();
-    return <BotMessage content={`Metadata Query Results: ${JSON.stringify(result)}`} />;
-  } catch (error) {
-    console.error('Metadata query failed:', error);
-    return <SystemMessage>Error: Could not process the metadata query.</SystemMessage>;
-  }
-}
-
-// Refactored function: Standard async function for WebSocket processing
-async function processWebSocketMessage(sessionId: string, content: string): Promise<string> {
+// Define WebSocket-based function for socket-based API request
+async function useSocketApiRequest(endpoint: string, payload: object): Promise<string> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket('wss://your-websocket-endpoint.com/ws/interactive-session');
+    const socket = new WebSocket(endpoint);
 
     socket.onopen = () => {
-      socket.send(JSON.stringify({ session_id: sessionId, user_query: content }));
+      socket.send(JSON.stringify(payload));
     };
 
     socket.onmessage = (event) => {
@@ -78,10 +42,34 @@ async function processWebSocketMessage(sessionId: string, content: string): Prom
   });
 }
 
+// Semantic Search Tool using WebSocket
+async function semanticSearchTool(query: string) {
+  try {
+    const response = await useSocketApiRequest('wss://your-websocket-endpoint.com/ws/semantic-search', { query });
+    return <BotMessage content={`Semantic Search Results: ${response}`} />;
+  } catch (error) {
+    console.error('Semantic search failed:', error);
+    return <SystemMessage>Error: Could not process the semantic search.</SystemMessage>;
+  }
+}
+
+// Metadata Query Tool using WebSocket
+async function metadataQueryTool(query: string) {
+  try {
+    const response = await useSocketApiRequest('wss://your-websocket-endpoint.com/ws/metadata-query', { query });
+    return <BotMessage content={`Metadata Query Results: ${response}`} />;
+  } catch (error) {
+    console.error('Metadata query failed:', error);
+    return <SystemMessage>Error: Could not process the metadata query.</SystemMessage>;
+  }
+}
+
+// Explicitly define parameter types for the generate function
 async function submitUserMessage(content: string) {
   'use server';
 
   const aiState = getMutableAIState<typeof AI>();
+
   aiState.update({
     ...aiState.get(),
     messages: [
@@ -96,41 +84,93 @@ async function submitUserMessage(content: string) {
 
   let textStream: undefined | ReturnType<typeof createStreamableValue<string>>;
   let textNode: undefined | React.ReactNode;
-  let streamClosed = false;
 
   const session = await auth();
   const sessionId = session?.user?.id || crypto.randomUUID();
 
   try {
-    // Use the refactored function for WebSocket processing
-    const responseContent = await processWebSocketMessage(sessionId, content);
+    const result = await streamUI({
+      model: openai('gpt-4o'), // Adjust the model if needed
+      initial: <SpinnerMessage />,
+      system: `
+      You are "Creators' Library," a creator economy data instrumentation assistant. Your goal is to provide quick, actionable solutions tailored to the user's needs, ensuring a seamless interaction.
 
-    if (!textStream) {
-      textStream = createStreamableValue('');
-      textNode = <BotMessage content={textStream.value} />;
-    }
+      **Primary Goal:**  
+      - Quickly display key insights from the backend's initial response.
+      - Use tools to gather additional context and data if required.
+      - Show loading states or progress indicators while waiting for the backend to process detailed responses.
 
-    textStream.update(responseContent);
-    textStream.done();
-    streamClosed = true;
+      **Handling Asynchronous Data:**  
+      - When receiving partial data, display it immediately to the user.
+      - Show a "Processing..." indicator or a loading animation for sections that are still being generated by the backend.
+      - Continuously poll or use WebSockets to stream data as the backend completes further processing.
 
-    aiState.update({
-      ...aiState.get(),
+      **User Guidance:**  
+      - Break down complex concepts into small, understandable chunks.
+      - Notify the user if additional information is required for a more detailed response.
+      - For long-running tasks (e.g., detailed script creation), keep the user updated on progress and estimated completion time.
+      `,
       messages: [
         ...aiState.get().messages,
         {
-          id: nanoid(),
-          role: 'assistant',
-          content: responseContent,
+          role: 'system',
+          content: `
+            You have access to the 'semanticSearchTool' and 'metadataQueryTool' to fetch information. Use them to generate responses based on real-time data from the backend.
+          `,
         },
       ],
+      text: ({ content, done, delta }) => {
+        if (!textStream) {
+          textStream = createStreamableValue('');
+          textNode = <BotMessage content={textStream.value} />;
+        }
+
+        if (done) {
+          textStream.done();
+          aiState.update({
+            ...aiState.get(),
+            messages: [
+              ...aiState.get().messages,
+              {
+                id: nanoid(),
+                role: 'assistant',
+                content,
+              },
+            ],
+          });
+        } else {
+          textStream.update(delta);
+        }
+
+        return textNode;
+      },
+      tools: {
+        semanticSearchTool: {
+          description: 'Perform a semantic search to augment content with relevant information using WebSocket-based requests.',
+          parameters: z.object({
+            query: z.string().describe('The user query to perform semantic search.'),
+          }),
+          generate: async ({ query }: { query: string }) => {
+            return semanticSearchTool(query);
+          },
+        },
+        metadataQueryTool: {
+          description: 'Execute a metadata query to fetch detailed creator information using WebSocket-based requests.',
+          parameters: z.object({
+            query: z.string().describe('The query for executing metadata search.'),
+          }),
+          generate: async ({ query }: { query: string }) => {
+            return metadataQueryTool(query);
+          },
+        },
+      },
     });
 
     return {
       id: nanoid(),
-      display: textNode,
+      display: result.value,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to process user message:', error);
     return {
       id: nanoid(),
@@ -149,12 +189,44 @@ export type UIState = {
   display: React.ReactNode;
 }[];
 
-export const AI = createAI<AIState, UIState>({
+interface CustomAIConfig {
+  actions: {
+    submitUserMessage: (content: string) => Promise<{ id: string; display: React.ReactNode }>;
+  };
+  tools: Record<string, any>;
+  initialAIState: AIState;
+  initialUIState: UIState;
+  onGetUIState: () => Promise<UIState | undefined>;
+  onSetAIState: ({ state }: { state: AIState }) => Promise<void>;
+}
+
+export const AI = createAI<AIState, UIState, CustomAIConfig>({
   actions: {
     submitUserMessage,
   },
+  tools: {
+    semanticSearchTool: {
+      description: 'Perform a semantic search to augment content with relevant information using WebSocket-based requests.',
+      parameters: z.object({
+        query: z.string().describe('The user query to perform semantic search.'),
+      }),
+      generate: async ({ query }: { query: string }) => {
+        return semanticSearchTool(query);
+      },
+    },
+    metadataQueryTool: {
+      description: 'Execute a metadata query to fetch detailed creator information using WebSocket-based requests.',
+      parameters: z.object({
+        query: z.string().describe('The query for executing metadata search.'),
+      }),
+      generate: async ({ query }: { query: string }) => {
+        return metadataQueryTool(query);
+      },
+    },
+  },
   initialAIState: { chatId: nanoid(), messages: [] },
   initialUIState: [],
+
   onGetUIState: async () => {
     'use server';
 
@@ -164,10 +236,12 @@ export const AI = createAI<AIState, UIState>({
       const aiState = getAIState() as Chat;
 
       if (aiState) {
-        return getUIStateFromAIState(aiState);
+        const uiState = getUIStateFromAIState(aiState);
+        return uiState;
       }
     }
   },
+
   onSetAIState: async ({ state }) => {
     'use server';
 
@@ -175,9 +249,11 @@ export const AI = createAI<AIState, UIState>({
 
     if (session && session.user) {
       const { chatId, messages } = state;
+
       const createdAt = new Date();
       const userId = session.user.id as string;
       const path = `/chat/${chatId}`;
+
       const firstMessageContent = messages[0].content as string;
       const title = firstMessageContent.substring(0, 100);
 
@@ -193,27 +269,7 @@ export const AI = createAI<AIState, UIState>({
       await saveChat(chat);
     }
   },
-  tools: {
-    semanticSearchTool: {
-      description: 'Perform a semantic search to augment content with relevant information.',
-      parameters: z.object({
-        query: z.string().describe('The user query to perform semantic search.'),
-      }),
-      generate: async ({ query }: { query: string }) => {
-        return semanticSearchTool(query);
-      },
-    },
-    metadataQueryTool: {
-      description: 'Execute a metadata query to fetch detailed creator information.',
-      parameters: z.object({
-        query: z.string().describe('The query for executing metadata search.'),
-      }),
-      generate: async ({ query }: { query: string }) => {
-        return executeMetadataQueryTool(query);
-      },
-    },
-  },
-} as CreateAIOptions<AIState, UIState>);
+} as CustomAIConfig);
 
 export const getUIStateFromAIState = (aiState: Chat) => {
   return aiState.messages
