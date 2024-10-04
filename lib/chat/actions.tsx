@@ -1,5 +1,4 @@
 import 'server-only';
-import { interactiveSession } from '../augmented_query';
 import { createAI, createStreamableUI, getMutableAIState, getAIState, streamUI, createStreamableValue } from 'ai/rsc';
 import { openai } from '@ai-sdk/openai';
 import { BotMessage, SystemMessage } from '@/components/stocks';
@@ -47,8 +46,8 @@ async function executeMetadataQueryTool(query: string) {
   }
 }
 
-// Establish WebSocket communication for long-running tasks
-async function useWebSocketForProcessing(sessionId: string, content: string): Promise<string> {
+// Refactored function: Standard async function for WebSocket processing
+async function processWebSocketMessage(sessionId: string, content: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket('wss://your-websocket-endpoint.com/ws/interactive-session');
 
@@ -103,8 +102,8 @@ async function submitUserMessage(content: string) {
   const sessionId = session?.user?.id || crypto.randomUUID();
 
   try {
-    // Use WebSocket for processing long-running tasks
-    const responseContent = await useWebSocketForProcessing(sessionId, content);
+    // Use the refactored function for WebSocket processing
+    const responseContent = await processWebSocketMessage(sessionId, content);
 
     if (!textStream) {
       textStream = createStreamableValue('');
@@ -114,6 +113,7 @@ async function submitUserMessage(content: string) {
     textStream.update(responseContent);
     textStream.done();
     streamClosed = true;
+
     aiState.update({
       ...aiState.get(),
       messages: [
@@ -164,11 +164,8 @@ export const AI = createAI<AIState, UIState>({
       const aiState = getAIState() as Chat;
 
       if (aiState) {
-        const uiState = getUIStateFromAIState(aiState);
-        return uiState;
+        return getUIStateFromAIState(aiState);
       }
-    } else {
-      return;
     }
   },
   onSetAIState: async ({ state }) => {
@@ -178,11 +175,9 @@ export const AI = createAI<AIState, UIState>({
 
     if (session && session.user) {
       const { chatId, messages } = state;
-
       const createdAt = new Date();
       const userId = session.user.id as string;
       const path = `/chat/${chatId}`;
-
       const firstMessageContent = messages[0].content as string;
       const title = firstMessageContent.substring(0, 100);
 
@@ -196,8 +191,6 @@ export const AI = createAI<AIState, UIState>({
       };
 
       await saveChat(chat);
-    } else {
-      return;
     }
   },
   tools: {
