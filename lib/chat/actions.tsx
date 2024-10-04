@@ -29,10 +29,10 @@ interface AIActions<AIStateType, UIStateType> {
 }
 
 // Define CustomAIConfig interface that extends AIActions
-interface CustomAIConfig extends AIActions<AIState, UIState> {}
+type CustomAIConfig = AIActions<AIState, UIState>;
 
 // Function to handle WebSocket-based API requests
-async function useSocketApiRequest(endpoint: string, payload: object): Promise<string> {
+async function socketApiRequest(endpoint: string, payload: object): Promise<string> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(endpoint);
 
@@ -63,10 +63,10 @@ async function useSocketApiRequest(endpoint: string, payload: object): Promise<s
   });
 }
 
-// Semantic Search Tool using WebSocket
+// In semanticSearchTool
 async function semanticSearchTool(query: string) {
   try {
-    const response = await useSocketApiRequest('wss://your-websocket-endpoint.com/ws/semantic-search', { query });
+    const response = await socketApiRequest('wss://your-websocket-endpoint.com/ws/semantic-search', { query });
     return <BotMessage content={`Semantic Search Results: ${response}`} />;
   } catch (error) {
     console.error('Semantic search failed:', error);
@@ -74,16 +74,17 @@ async function semanticSearchTool(query: string) {
   }
 }
 
-// Metadata Query Tool using WebSocket
+// In metadataQueryTool
 async function metadataQueryTool(query: string) {
   try {
-    const response = await useSocketApiRequest('wss://your-websocket-endpoint.com/ws/metadata-query', { query });
+    const response = await socketApiRequest('wss://your-websocket-endpoint.com/ws/metadata-query', { query });
     return <BotMessage content={`Metadata Query Results: ${response}`} />;
   } catch (error) {
     console.error('Metadata query failed:', error);
     return <SystemMessage>Error: Could not process the metadata query.</SystemMessage>;
   }
 }
+
 
 // Explicitly define parameter types for the generate function
 async function submitUserMessage(content: string) {
