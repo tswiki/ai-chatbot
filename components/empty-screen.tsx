@@ -8,11 +8,12 @@ export function EmptyScreen() {
         </h1>
         <p></p>
         <p className="leading-normal text-muted-foreground">
-          We enhance the connection between creators and their audiences by transforming 
-          educational content into immersive and interactive experiences.</p>
+         Creators' Library uses your favourite creators' concepts and models to enhance your
+         direct marketing campaigns. It helps you craft the necessary copywriting, content and 
+         workflow strategies required to drive market defining conversions within
+         your info business.
+        </p>
         <p></p>
-        <p className="leading-normal text-muted-foreground">
-          Our approach makes the learning and implementation behind these concepts more intuitive and relevant to the end user allowing them to augment them into their creative strategy and thought patterns. </p>
       </div>
     </div>
   )

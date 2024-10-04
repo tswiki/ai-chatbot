@@ -12,7 +12,7 @@ import { SidebarMobile } from './sidebar-mobile'
 import { SidebarToggle } from './sidebar-toggle'
 import { ChatHistory } from './chat-history'
 import { Session } from '@/lib/types'
-
+import { CollectionsPopover } from '@/components/collections-popover'
 
 async function UserOrLogin() {
   const session = (await auth()) as Session
@@ -62,6 +62,10 @@ export async function Header() {
       </div>
       <div className="flex items-center justify-end">
       
+      <CollectionsPopover className={cn(buttonVariants({ variant: 'ghost' }), 'pr-6')}>
+      <span className="flex items-center">Collections</span>
+      </CollectionsPopover>
+
         <a
           href="https://forms.gle/PgoMnMJ7Hq1dppES7"
           target="_blank"
