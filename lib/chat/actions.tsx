@@ -1,6 +1,4 @@
 import 'server-only';
-
-import { interactiveSession } from '../augmented_query';
 import { createAI, createStreamableUI, getMutableAIState, getAIState, streamUI, createStreamableValue } from 'ai/rsc';
 import { openai } from '@ai-sdk/openai';
 import { BotMessage, SystemMessage } from '@/components/stocks';
@@ -11,21 +9,20 @@ import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
 
-// Extend the type of createAI to include tools
-interface CreateAIOptions {
+// Define the CreateAIOptions interface
+interface CreateAIOptions<AIStateType, UIStateType> {
   actions: {
     submitUserMessage: (content: string) => Promise<{ id: string; display: React.ReactNode }>;
   };
-  initialAIState: AIState;
-  initialUIState: UIState;
-  onGetUIState: () => Promise<UIState | undefined>;
-  onSetAIState: ({ state }: { state: AIState }) => Promise<void>;
-  tools?: Record<string, any>; // Add the optional tools property
+  initialAIState: AIStateType;
+  initialUIState: UIStateType;
+  onGetUIState: () => Promise<UIStateType | undefined>;
+  onSetAIState: ({ state }: { state: AIStateType }) => Promise<void>;
+  tools?: Record<string, any>; // Optional tools property
 }
 
 // Define the new tools
 async function semanticSearchTool(query: string) {
-  // Call the semantic search function
   try {
     const response = await fetch(`https://graph-rag-avde.onrender.com/semanticsearch/${encodeURIComponent(query)}`, {
       headers: { 'Content-Type': 'application/json' },
@@ -39,7 +36,6 @@ async function semanticSearchTool(query: string) {
 }
 
 async function executeMetadataQueryTool(query: string) {
-  // Call the metadata query function
   try {
     const response = await fetch(`https://metadata-rag.onrender.com/execute_metadata_query/${encodeURIComponent(query)}`, {
       headers: { 'Content-Type': 'application/json' },
@@ -70,7 +66,7 @@ async function submitUserMessage(content: string) {
 
   let textStream: undefined | ReturnType<typeof createStreamableValue<string>>;
   let textNode: undefined | React.ReactNode;
-  let streamClosed = false; // Add a flag to track stream state
+  let streamClosed = false;
 
   const session = await auth();
   const sessionId = session?.user?.id || crypto.randomUUID();
@@ -81,7 +77,7 @@ async function submitUserMessage(content: string) {
   while (retries < maxRetries) {
     try {
       const result = await streamUI({
-        model: openai('gpt-4o'), // Adjust the model if needed
+        model: openai('gpt-4o'),
         initial: <SpinnerMessage />,
         system: `
         You are "Creators' Library," a triager for revitalise.io, an IPGA growth partner helping users achieve a comprehensive understanding of their audience's intent. Your job is to process user queries quickly and efficiently, returning initial key insights immediately and following up with detailed information as needed.
@@ -96,7 +92,6 @@ async function submitUserMessage(content: string) {
 
         **Tools and Usage Instructions:**  
         - Available tools: {tools}
-        - You can use any of the following tools by their names: {tool_names}
         - Utilize the "semantic search" tool to provide evidence for any information generated.
         - Use the "metadata query" tool for detailed creator metadata and context extraction for richer prompts.
         - For long-running tasks (e.g., detailed script creation), keep the user updated on progress and estimated completion time.
@@ -104,34 +99,13 @@ async function submitUserMessage(content: string) {
         **Conversation Flow:**  
         - Always start with an immediate, concise response to the user's input.
         - Use placeholders to indicate when more detailed information is being processed asynchronously.
-        - Ensure clear communication to the user about the processing status and expected delivery of detailed results.
         `,
         messages: [
           ...aiState.get().messages,
           {
             role: 'system',
             content: `
-              You are "Creators' Library," a triager for revitalise.io, an IPGA growth partner helping users achieve a comprehensive understanding of their audience's intent. Your job is to process user queries quickly and efficiently, returning initial key insights immediately and following up with detailed information as needed.
-
-              **Primary Goal:**  
-              - Provide users with an immediate summary or actionable insights relevant to their query.
-              - Break down complex information into smaller, digestible chunks to process responses quickly, ensuring users receive an overview first and detailed follow-ups asynchronously.
-
-              **Asynchronous Processing:**  
-              - For larger tasks, return a brief overview or an initial response within 5 seconds. After the initial response, continue processing more detailed information in the background.
-              - Use markers like "[Processing detailed response...]" to indicate that further processing is occurring.
-
-              **Tools and Usage Instructions:**  
-              - Available tools: {tools}
-              - You can use any of the following tools by their names: {tool_names}
-              - Utilize the "semantic search" tool to provide evidence for any information generated.
-              - Use the "metadata query" tool for detailed creator metadata and context extraction for richer prompts.
-              - For long-running tasks (e.g., detailed script creation), keep the user updated on progress and estimated completion time.
-
-              **Conversation Flow:**  
-              - Always start with an immediate, concise response to the user's input.
-              - Use placeholders to indicate when more detailed information is being processed asynchronously.
-              - Ensure clear communication to the user about the processing status and expected delivery of detailed results.
+              You are "Creators' Library," a triager for revitalise.io, an IPGA growth partner helping users achieve a comprehensive understanding of their audience's intent...
               `,
           },
         ],
@@ -141,9 +115,9 @@ async function submitUserMessage(content: string) {
             textNode = <BotMessage content={textStream.value} />;
           }
 
-          if (done && !streamClosed) { // Check if stream is already closed
+          if (done && !streamClosed) {
             textStream.done();
-            streamClosed = true; // Mark stream as closed
+            streamClosed = true;
             aiState.update({
               ...aiState.get(),
               messages: [
@@ -163,7 +137,7 @@ async function submitUserMessage(content: string) {
         },
         tools: {
           semanticSearchTool: {
-            description: "Perform a semantic search on an existing knowledge base to augment generated content with accurate and factual information to create a better end user experience",
+            description: "Perform a semantic search to augment content with accurate information.",
             parameters: z.object({
               query: z.string().describe('The user query to perform semantic search.'),
             }),
@@ -172,7 +146,7 @@ async function submitUserMessage(content: string) {
             },
           },
           metadataQueryTool: {
-            description: "Extract creator metadata and context from the graphbase to support the response from the semantic search",
+            description: "Execute a metadata query for creator information.",
             parameters: z.object({
               query: z.string().describe('The query for executing metadata search.'),
             }),
@@ -191,7 +165,6 @@ async function submitUserMessage(content: string) {
       console.error(`Attempt ${retries + 1} failed:`, error);
       retries++;
       if (retries === maxRetries) {
-        console.error('Max retries reached. Returning error message.');
         let errorMessage = 'An error occurred. Please try again later.';
         if (error.message && error.message.includes('Pipeline is empty')) {
           errorMessage = 'The AI system is currently unavailable. Please try again in a few minutes.';
@@ -203,11 +176,10 @@ async function submitUserMessage(content: string) {
           display: <SystemMessage>{errorMessage}</SystemMessage>,
         };
       }
-      await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, 1000 * retries));
     }
   }
 }
-
 
 export type AIState = {
   chatId: string;
@@ -290,8 +262,7 @@ export const AI = createAI<AIState, UIState>({
       },
     },
   },
-  
-} as CreateAIOptions);
+} as CreateAIOptions<AIState, UIState>); // Use the defined CreateAIOptions
 
 export const getUIStateFromAIState = (aiState: Chat) => {
   return aiState.messages
