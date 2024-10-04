@@ -14,45 +14,66 @@ const logError = (message: string) => {
  * Function to make a POST request to the FastAPI endpoint.
  * If the session_id is invalid, a new random UUID is generated.
  */
-
 export const interactiveSession = async (sessionId: string, query: string): Promise<any> => {
   // Validate or generate a new UUID
   const validSessionId: string = String(sessionId);
 
-  // Define the endpoint URL
-  const url = 'https://agentic-rag-m21c.onrender.com/interactive-session';
+  // Define the WebSocket URL
+  const url = 'wss://agentic-rag-m21c.onrender.com/ws/interactive-session';
 
-  // Define the payload with the required parameters
-  const payload = {
-    session_id: validSessionId,  // Use the (validated or newly generated) session ID
-    user_query: query,  // Use the provided query
-  };
+  // Create a new WebSocket instance
+  const socket = new WebSocket(url);
 
-  try {
-    // Make the POST request to the FastAPI endpoint
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+  // Create a promise to handle asynchronous communication with the WebSocket
+  return new Promise((resolve, reject) => {
+    // Handle WebSocket connection open event
+    socket.onopen = () => {
+      // Define the payload to send to the WebSocket
+      const payload = {
+        session_id: validSessionId,
+        user_query: query,
+      };
+      // Send the payload as a JSON string
+      socket.send(JSON.stringify(payload));
+    };
 
-    // Check if the request was successful
-    if (response.ok) {
-      const data = await response.json();
-      logDebug(`Response from API: ${JSON.stringify(data)}`);
-      return data; // Return the successful response data
-    } else {
-      const errorText = await response.text();
-      logError(`Failed to get response. Status code: ${response.status}, Error: ${errorText}`);
-      return null; // Return null or throw an error to indicate failure
-    }
-  } catch (error) {
-    logError(`An error occurred while making the request: ${error}`);
-    return null; // Return null or throw an error to indicate an unexpected error
-  }
+    // Handle messages received from the WebSocket
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.response) {
+          // Successful response received
+          logDebug(`Response from WebSocket: ${JSON.stringify(data)}`);
+          resolve(data); // Resolve the promise with the response data
+        } else if (data.error) {
+          // Error response received
+          logError(`Error from WebSocket: ${data.error}`);
+          reject(new Error(data.error)); // Reject the promise with the error message
+        }
+      } catch (error) {
+        logError(`An error occurred while processing the WebSocket response: ${error}`);
+        reject(error); // Reject the promise with the error
+      }
+    };
+
+    // Handle WebSocket errors
+    socket.onerror = (event) => {
+      logError(`WebSocket error: ${event}`);
+      reject(new Error('WebSocket error occurred.'));
+    };
+
+    // Handle WebSocket connection close event
+    socket.onclose = (event) => {
+      if (event.wasClean) {
+        logDebug('WebSocket connection closed cleanly.');
+      } else {
+        logError(`WebSocket connection closed with code: ${event.code}, reason: ${event.reason}`);
+      }
+    };
+  });
 };
+
 
 
 // Example usage in a Next.js app component or page
