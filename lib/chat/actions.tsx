@@ -2,15 +2,36 @@ import 'server-only';
 
 import { createAI, createStreamableUI, getMutableAIState, getAIState, streamUI, createStreamableValue } from 'ai/rsc';
 import { openai } from '@ai-sdk/openai';
-import { BotMessage, SystemMessage } from '@/components/stocks';
+import { BotMessage, SystemMessage, BotCard } from '@/components/stocks';
 import { z } from 'zod';
-import { nanoid } from '@/lib/utils';
+import { nanoid, sleep } from '@/lib/utils';
 import { saveChat } from '@/app/actions';
 import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
 
-// Define WebSocket-based function for socket-based API request
+// Define a generic action interface to satisfy the createAI constraint
+interface AIActions<AIStateType, UIStateType> {
+  actions: {
+    submitUserMessage: (content: string) => Promise<{ id: string; display: React.ReactNode }>;
+  };
+  tools: {
+    [key: string]: {
+      description: string;
+      parameters: z.ZodObject<any>;
+      generate: (args: any) => Promise<React.ReactNode>;
+    };
+  };
+  initialAIState: AIStateType;
+  initialUIState: UIStateType;
+  onGetUIState: () => Promise<UIStateType | undefined>;
+  onSetAIState: ({ state }: { state: AIStateType }) => Promise<void>;
+}
+
+// Define CustomAIConfig interface that extends AIActions
+interface CustomAIConfig extends AIActions<AIState, UIState> {}
+
+// Function to handle WebSocket-based API requests
 async function useSocketApiRequest(endpoint: string, payload: object): Promise<string> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(endpoint);
@@ -85,12 +106,9 @@ async function submitUserMessage(content: string) {
   let textStream: undefined | ReturnType<typeof createStreamableValue<string>>;
   let textNode: undefined | React.ReactNode;
 
-  const session = await auth();
-  const sessionId = session?.user?.id || crypto.randomUUID();
-
   try {
     const result = await streamUI({
-      model: openai('gpt-4o'), // Adjust the model if needed
+      model: openai('gpt-4o'),
       initial: <SpinnerMessage />,
       system: `
       You are "Creators' Library," a creator economy data instrumentation assistant. Your goal is to provide quick, actionable solutions tailored to the user's needs, ensuring a seamless interaction.
@@ -189,24 +207,13 @@ export type UIState = {
   display: React.ReactNode;
 }[];
 
-interface CustomAIConfig {
-  actions: {
-    submitUserMessage: (content: string) => Promise<{ id: string; display: React.ReactNode }>;
-  };
-  tools: Record<string, any>;
-  initialAIState: AIState;
-  initialUIState: UIState;
-  onGetUIState: () => Promise<UIState | undefined>;
-  onSetAIState: ({ state }: { state: AIState }) => Promise<void>;
-}
-
-export const AI = createAI<AIState, UIState, CustomAIConfig>({
+export const AI = createAI<AIState, UIState>({
   actions: {
     submitUserMessage,
   },
   tools: {
     semanticSearchTool: {
-      description: 'Perform a semantic search to augment content with relevant information using WebSocket-based requests.',
+      description: 'Perform a semantic search to find relevant information to support and enhance responses.',
       parameters: z.object({
         query: z.string().describe('The user query to perform semantic search.'),
       }),
@@ -215,7 +222,7 @@ export const AI = createAI<AIState, UIState, CustomAIConfig>({
       },
     },
     metadataQueryTool: {
-      description: 'Execute a metadata query to fetch detailed creator information using WebSocket-based requests.',
+      description: 'Execute a metadata query to fetch detailed creator information and context for enhanced responses.',
       parameters: z.object({
         query: z.string().describe('The query for executing metadata search.'),
       }),
