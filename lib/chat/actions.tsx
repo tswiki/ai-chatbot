@@ -11,6 +11,7 @@ import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
 import axios from 'axios';
+import * as React from 'react';
 
 // Define a generic action interface to satisfy the createAI constraint
 interface AIActions<AIStateType, UIStateType> {
@@ -33,43 +34,32 @@ interface AIActions<AIStateType, UIStateType> {
 // Define CustomAIConfig interface that extends AIActions
 type CustomAIConfig = AIActions<AIState, UIState>;
 
-// Function to handle HTTP-based API requests with retry mechanism
-async function httpApiRequest(endpoint: string, payload: object, retries = 3): Promise<string> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      console.log(`Attempt ${attempt}: Sending request to ${endpoint} with payload:`, payload);
-      const response = await axios.post(endpoint, payload, { timeout: 10000 }); // 10-second timeout
-      console.log(`Attempt ${attempt}: Received response:`, response.data);
-      if (response.data.response) {
-        return response.data.response;
-      } else if (response.data.error) {
-        throw new Error(response.data.error);
-      }
-      throw new Error('Unexpected response format');
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error(`Attempt ${attempt} failed: ${error.message}`);
-        if (attempt === retries) {
-          throw new Error(`HTTP request failed after ${retries} attempts: ${error.message}`);
-        }
-      } else {
-        console.error(`Attempt ${attempt} failed with an unknown error`);
-        if (attempt === retries) {
-          throw new Error('HTTP request failed with an unknown error after maximum retries');
-        }
-      }
-    }
-  }
-  throw new Error('HTTP request failed after maximum retries');
-}
 
-// Semantic Search Tool using HTTP request
+
 async function semanticSearchTool(query: string) {
   console.log('semanticSearchTool: Starting semantic search with query:', query);
+
+  // Encode the query string
+  const encodedQuery = encodeURIComponent(query);
+
+  // Construct the URL
+  const url = `https://graph-rag-avde.onrender.com/semanticsearch/${encodedQuery}`;
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
   try {
-    const response = await httpApiRequest('https://your-http-endpoint.com/api/semantic-search', { query });
-    console.log('semanticSearchTool: Received response:', response);
-    return <BotMessage content={`Semantic Search Results: ${response}`} />;
+    // Execute the GET request using axios
+    const response = await axios.get(url, { headers });
+    
+    // Check if the request was successful and contains data
+    if (response.status === 200 && response.data) {
+      console.log('semanticSearchTool: Received response:', response.data);
+      return <BotMessage content={`Semantic Search Results: ${JSON.stringify(response.data)}`} />;
+    } else {
+      console.error('Error: Received empty response from the server.');
+      return <SystemMessage>Error: Received empty response from the server.</SystemMessage>;
+    }
   } catch (error) {
     console.error('Semantic search failed:', error);
     return <SystemMessage>Error: Could not process the semantic search.</SystemMessage>;
@@ -79,15 +69,34 @@ async function semanticSearchTool(query: string) {
 // Metadata Query Tool using HTTP request
 async function metadataQueryTool(query: string) {
   console.log('metadataQueryTool: Starting metadata query with query:', query);
+
+  // Encode the query string
+  const encodedQuery = encodeURIComponent(query);
+
+  // Construct the URL
+  const url = `https://metadata-rag.onrender.com/execute_metadata_query/${encodedQuery}`;
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
   try {
-    const response = await httpApiRequest('https://your-http-endpoint.com/api/metadata-query', { query });
-    console.log('metadataQueryTool: Received response:', response);
-    return <BotMessage content={`Metadata Query Results: ${response}`} />;
+    // Execute the GET request using axios
+    const response = await axios.get(url, { headers });
+    
+    // Check if the request was successful and contains data
+    if (response.status === 200 && response.data) {
+      console.log('metadataQueryTool: Received response:', response.data);
+      return <BotMessage content={`Metadata Query Results: ${JSON.stringify(response.data)}`} />;
+    } else {
+      console.error('Error: Received empty response from the server.');
+      return <SystemMessage>Error: Received empty response from the server.</SystemMessage>;
+    }
   } catch (error) {
     console.error('Metadata query failed:', error);
     return <SystemMessage>Error: Could not process the metadata query.</SystemMessage>;
   }
 }
+
 
 // Explicitly define parameter types for the generate function
 async function submitUserMessage(content: string) {
