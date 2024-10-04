@@ -1,10 +1,12 @@
+
+
 import 'server-only';
 
 import { createAI, createStreamableUI, getMutableAIState, getAIState, streamUI, createStreamableValue } from 'ai/rsc';
 import { openai } from '@ai-sdk/openai';
-import { BotMessage, SystemMessage, BotCard } from '@/components/stocks';
+import { BotMessage, SystemMessage } from '@/components/stocks';
 import { z } from 'zod';
-import { nanoid, sleep } from '@/lib/utils';
+import { nanoid } from '@/lib/utils';
 import { saveChat } from '@/app/actions';
 import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
@@ -31,42 +33,43 @@ interface AIActions<AIStateType, UIStateType> {
 // Define CustomAIConfig interface that extends AIActions
 type CustomAIConfig = AIActions<AIState, UIState>;
 
-// Function to handle WebSocket-based API requests
-async function socketApiRequest(endpoint: string, payload: object): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const socket = new WebSocket(endpoint);
+// Function to handle HTTP-based API requests
+async function httpApiRequest(endpoint: string, payload: object): Promise<string> {
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-    socket.onopen = () => {
-      socket.send(JSON.stringify(payload));
-    };
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-    socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.response) {
-          resolve(data.response);
-        } else if (data.error) {
-          reject(new Error(data.error));
-        }
-      } catch (error) {
-        reject(new Error('Failed to process WebSocket response.'));
-      }
-    };
+    const data = await response.json();
+    if (data.response) {
+      return data.response;
+    } else if (data.error) {
+      throw new Error(data.error);
+    }
 
-    socket.onerror = (error) => {
-      reject(new Error('WebSocket error occurred.'));
-    };
-
-    socket.onclose = () => {
-      console.log('WebSocket connection closed.');
-    };
-  });
+    throw new Error('Unexpected response format');
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`HTTP request failed: ${error.message}`);
+    } else {
+      throw new Error('HTTP request failed with an unknown error');
+    }
+  }
 }
 
-// In semanticSearchTool
+
+// Semantic Search Tool using HTTP request
 async function semanticSearchTool(query: string) {
   try {
-    const response = await socketApiRequest('wss://your-websocket-endpoint.com/ws/semantic-search', { query });
+    const response = await httpApiRequest('https://your-http-endpoint.com/api/semantic-search', { query });
     return <BotMessage content={`Semantic Search Results: ${response}`} />;
   } catch (error) {
     console.error('Semantic search failed:', error);
@@ -74,17 +77,16 @@ async function semanticSearchTool(query: string) {
   }
 }
 
-// In metadataQueryTool
+// Metadata Query Tool using HTTP request
 async function metadataQueryTool(query: string) {
   try {
-    const response = await socketApiRequest('wss://your-websocket-endpoint.com/ws/metadata-query', { query });
+    const response = await httpApiRequest('https://your-http-endpoint.com/api/metadata-query', { query });
     return <BotMessage content={`Metadata Query Results: ${response}`} />;
   } catch (error) {
     console.error('Metadata query failed:', error);
     return <SystemMessage>Error: Could not process the metadata query.</SystemMessage>;
   }
 }
-
 
 // Explicitly define parameter types for the generate function
 async function submitUserMessage(content: string) {
@@ -165,7 +167,7 @@ async function submitUserMessage(content: string) {
       },
       tools: {
         semanticSearchTool: {
-          description: 'Perform a semantic search to augment content with relevant information using WebSocket-based requests.',
+          description: 'Perform a semantic search to augment content with relevant information using HTTP requests.',
           parameters: z.object({
             query: z.string().describe('The user query to perform semantic search.'),
           }),
@@ -174,7 +176,7 @@ async function submitUserMessage(content: string) {
           },
         },
         metadataQueryTool: {
-          description: 'Execute a metadata query to fetch detailed creator information using WebSocket-based requests.',
+          description: 'Execute a metadata query to fetch detailed creator information using HTTP requests.',
           parameters: z.object({
             query: z.string().describe('The query for executing metadata search.'),
           }),
@@ -189,11 +191,16 @@ async function submitUserMessage(content: string) {
       id: nanoid(),
       display: result.value,
     };
-  } catch (error: any) {
-    console.error('Failed to process user message:', error);
+  } catch (error: unknown) {
+    let errorMessage = 'Error: Could not process the request.';
+    if (error instanceof Error) {
+      errorMessage = `Error: ${error.message}`;
+    }
+
+    console.error('Failed to process user message:', errorMessage);
     return {
       id: nanoid(),
-      display: <SystemMessage>Error: Could not process the request.</SystemMessage>,
+      display: <SystemMessage>{errorMessage}</SystemMessage>,
     };
   }
 }
