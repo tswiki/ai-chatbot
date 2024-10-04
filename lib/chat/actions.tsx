@@ -1,4 +1,5 @@
 import 'server-only';
+import { interactiveSession } from '../augmented_query';
 import { createAI, createStreamableUI, getMutableAIState, getAIState, streamUI, createStreamableValue } from 'ai/rsc';
 import { openai } from '@ai-sdk/openai';
 import { BotMessage, SystemMessage } from '@/components/stocks';
@@ -9,7 +10,6 @@ import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
 
-// Define the CreateAIOptions interface
 interface CreateAIOptions<AIStateType, UIStateType> {
   actions: {
     submitUserMessage: (content: string) => Promise<{ id: string; display: React.ReactNode }>;
@@ -18,10 +18,9 @@ interface CreateAIOptions<AIStateType, UIStateType> {
   initialUIState: UIStateType;
   onGetUIState: () => Promise<UIStateType | undefined>;
   onSetAIState: ({ state }: { state: AIStateType }) => Promise<void>;
-  tools?: Record<string, any>; // Optional tools property
+  tools?: Record<string, any>;
 }
 
-// Define the new tools
 async function semanticSearchTool(query: string) {
   try {
     const response = await fetch(`https://graph-rag-avde.onrender.com/semanticsearch/${encodeURIComponent(query)}`, {
@@ -48,6 +47,38 @@ async function executeMetadataQueryTool(query: string) {
   }
 }
 
+// Establish WebSocket communication for long-running tasks
+async function useWebSocketForProcessing(sessionId: string, content: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket('wss://your-websocket-endpoint.com/ws/interactive-session');
+
+    socket.onopen = () => {
+      socket.send(JSON.stringify({ session_id: sessionId, user_query: content }));
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.response) {
+          resolve(data.response);
+        } else if (data.error) {
+          reject(new Error(data.error));
+        }
+      } catch (error) {
+        reject(new Error('Failed to process WebSocket response.'));
+      }
+    };
+
+    socket.onerror = (error) => {
+      reject(new Error('WebSocket error occurred.'));
+    };
+
+    socket.onclose = () => {
+      console.log('WebSocket connection closed.');
+    };
+  });
+}
+
 async function submitUserMessage(content: string) {
   'use server';
 
@@ -71,113 +102,40 @@ async function submitUserMessage(content: string) {
   const session = await auth();
   const sessionId = session?.user?.id || crypto.randomUUID();
 
-  const maxRetries = 3;
-  let retries = 0;
+  try {
+    // Use WebSocket for processing long-running tasks
+    const responseContent = await useWebSocketForProcessing(sessionId, content);
 
-  while (retries < maxRetries) {
-    try {
-      const result = await streamUI({
-        model: openai('gpt-4o'),
-        initial: <SpinnerMessage />,
-        system: `
-        You are "Creators' Library," a triager for revitalise.io, an IPGA growth partner helping users achieve a comprehensive understanding of their audience's intent. Your job is to process user queries quickly and efficiently, returning initial key insights immediately and following up with detailed information as needed.
-
-        **Primary Goal:**  
-        - Provide users with an immediate summary or actionable insights relevant to their query.
-        - Break down complex information into smaller, digestible chunks to process responses quickly, ensuring users receive an overview first and detailed follow-ups asynchronously.
-
-        **Asynchronous Processing:**  
-        - For larger tasks, return a brief overview or an initial response within 5 seconds. After the initial response, continue processing more detailed information in the background.
-        - Use markers like "[Processing detailed response...]" to indicate that further processing is occurring.
-
-        **Tools and Usage Instructions:**  
-        - Available tools: {tools}
-        - Utilize the "semantic search" tool to provide evidence for any information generated.
-        - Use the "metadata query" tool for detailed creator metadata and context extraction for richer prompts.
-        - For long-running tasks (e.g., detailed script creation), keep the user updated on progress and estimated completion time.
-
-        **Conversation Flow:**  
-        - Always start with an immediate, concise response to the user's input.
-        - Use placeholders to indicate when more detailed information is being processed asynchronously.
-        `,
-        messages: [
-          ...aiState.get().messages,
-          {
-            role: 'system',
-            content: `
-              You are "Creators' Library," a triager for revitalise.io, an IPGA growth partner helping users achieve a comprehensive understanding of their audience's intent...
-              `,
-          },
-        ],
-        text: ({ content, done, delta }) => {
-          if (!textStream) {
-            textStream = createStreamableValue('');
-            textNode = <BotMessage content={textStream.value} />;
-          }
-
-          if (done && !streamClosed) {
-            textStream.done();
-            streamClosed = true;
-            aiState.update({
-              ...aiState.get(),
-              messages: [
-                ...aiState.get().messages,
-                {
-                  id: nanoid(),
-                  role: 'assistant',
-                  content,
-                },
-              ],
-            });
-          } else if (!done) {
-            textStream.update(delta);
-          }
-
-          return textNode;
-        },
-        tools: {
-          semanticSearchTool: {
-            description: "Perform a semantic search to augment content with accurate information.",
-            parameters: z.object({
-              query: z.string().describe('The user query to perform semantic search.'),
-            }),
-            generate: async ({ query }: { query: string }) => {
-              return semanticSearchTool(query);
-            },
-          },
-          metadataQueryTool: {
-            description: "Execute a metadata query for creator information.",
-            parameters: z.object({
-              query: z.string().describe('The query for executing metadata search.'),
-            }),
-            generate: async ({ query }: { query: string }) => {
-              return executeMetadataQueryTool(query);
-            },
-          },
-        },
-      });
-
-      return {
-        id: nanoid(),
-        display: result.value,
-      };
-    } catch (error: any) {
-      console.error(`Attempt ${retries + 1} failed:`, error);
-      retries++;
-      if (retries === maxRetries) {
-        let errorMessage = 'An error occurred. Please try again later.';
-        if (error.message && error.message.includes('Pipeline is empty')) {
-          errorMessage = 'The AI system is currently unavailable. Please try again in a few minutes.';
-        } else if (error.name === 'NetworkError' || !navigator.onLine) {
-          errorMessage = 'Network error. Please check your internet connection and try again.';
-        }
-        return {
-          id: nanoid(),
-          display: <SystemMessage>{errorMessage}</SystemMessage>,
-        };
-      }
-      await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+    if (!textStream) {
+      textStream = createStreamableValue('');
+      textNode = <BotMessage content={textStream.value} />;
     }
+
+    textStream.update(responseContent);
+    textStream.done();
+    streamClosed = true;
+    aiState.update({
+      ...aiState.get(),
+      messages: [
+        ...aiState.get().messages,
+        {
+          id: nanoid(),
+          role: 'assistant',
+          content: responseContent,
+        },
+      ],
+    });
+
+    return {
+      id: nanoid(),
+      display: textNode,
+    };
+  } catch (error) {
+    console.error('Failed to process user message:', error);
+    return {
+      id: nanoid(),
+      display: <SystemMessage>Error: Could not process the request.</SystemMessage>,
+    };
   }
 }
 
@@ -262,7 +220,7 @@ export const AI = createAI<AIState, UIState>({
       },
     },
   },
-} as CreateAIOptions<AIState, UIState>); // Use the defined CreateAIOptions
+} as CreateAIOptions<AIState, UIState>);
 
 export const getUIStateFromAIState = (aiState: Chat) => {
   return aiState.messages
