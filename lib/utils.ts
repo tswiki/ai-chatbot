@@ -97,3 +97,34 @@ export const getMessageFromCode = (resultCode: string) => {
       return 'Logged in!'
   }
 }
+
+
+export async function retry<T>(
+  fn: () => Promise<T>,
+  options: {
+    retries: number;
+    factor: number;
+    minTimeout: number;
+    maxTimeout: number;
+    onRetry: (error: Error, attempt: number) => void;
+  }
+): Promise<T> {
+  let lastError: Error;
+  for (let attempt = 1; attempt <= options.retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      options.onRetry(lastError, attempt);
+      if (attempt === options.retries) {
+        throw lastError;
+      }
+      const delay = Math.min(
+        options.minTimeout * Math.pow(options.factor, attempt - 1),
+        options.maxTimeout
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError!;
+}

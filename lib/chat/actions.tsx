@@ -1,104 +1,60 @@
 
+
 import 'server-only';
 
-import { createAI, createStreamableUI, getMutableAIState, getAIState, streamUI, createStreamableValue } from 'ai/rsc';
+import { interactiveSession } from '../augmented_query';
+
+import {
+  createAI,
+  createStreamableUI,
+  getMutableAIState,
+  getAIState,
+  streamUI,
+  createStreamableValue,
+} from 'ai/rsc';
+
 import { openai } from '@ai-sdk/openai';
+
 import { BotMessage, SystemMessage } from '@/components/stocks';
 import { z } from 'zod';
+
 import { nanoid } from '@/lib/utils';
+
 import { saveChat } from '@/app/actions';
 import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
-import axios from 'axios';
-import * as React from 'react';
 
-// Define a generic action interface to satisfy the createAI constraint
-interface AIActions<AIStateType, UIStateType> {
+
+function isChat(obj: any): obj is Chat {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'id' in obj &&
+    'title' in obj &&
+    'createdAt' in obj &&
+    'userId' in obj &&
+    'path' in obj &&
+    'messages' in obj &&
+    Array.isArray(obj.messages)
+  );
+}
+
+// Extend the type of createAI to include tools
+interface CreateAIOptions {
   actions: {
     submitUserMessage: (content: string) => Promise<{ id: string; display: React.ReactNode }>;
   };
-  tools: {
-    [key: string]: {
-      description: string;
-      parameters: z.ZodObject<any>;
-      generate: (args: any) => Promise<React.ReactNode>;
-    };
-  };
-  initialAIState: AIStateType;
-  initialUIState: UIStateType;
-  onGetUIState: () => Promise<UIStateType | undefined>;
-  onSetAIState: ({ state }: { state: AIStateType }) => Promise<void>;
+  initialAIState: AIState;
+  initialUIState: UIState;
+  onGetUIState: () => Promise<UIState | undefined>;
+  onSetAIState: ({ state }: { state: AIState }) => Promise<void>;
+  tools?: Record<string, any>; // Add the optional tools property
 }
 
-// Define CustomAIConfig interface that extends AIActions
-type CustomAIConfig = AIActions<AIState, UIState>;
-
-
-
-async function semanticSearchTool(query: string) {
-  console.log('semanticSearchTool: Starting semantic search with query:', query);
-
-  // Encode the query string
-  const encodedQuery = encodeURIComponent(query);
-  const url = `https://graph-rag-avde.onrender.com/semanticsearch/${encodedQuery}`;
-  const headers = {
-    'Content-Type': 'application/json',
-  };
-
-  try {
-    // Execute the GET request using axios
-    const response = await axios.get(url, { headers });
-
-    if (response.status === 200 && response.data) {
-      console.log('semanticSearchTool: Received response:', response.data);
-      // Return the raw data to be used by the LLM
-      return response.data;
-    } else {
-      console.error('Error: Received empty response from the server.');
-      return 'Error: Received empty response from the server.';
-    }
-  } catch (error) {
-    console.error('Semantic search failed:', error);
-    return 'Error: Could not process the semantic search.';
-  }
-}
-
-async function metadataQueryTool(query: string) {
-  console.log('metadataQueryTool: Starting metadata query with query:', query);
-
-  // Encode the query string
-  const encodedQuery = encodeURIComponent(query);
-  const url = `https://metadata-rag.onrender.com/execute_metadata_query/${encodedQuery}`;
-  const headers = {
-    'Content-Type': 'application/json',
-  };
-
-  try {
-    // Execute the GET request using axios
-    const response = await axios.get(url, { headers });
-
-    if (response.status === 200 && response.data) {
-      console.log('metadataQueryTool: Received response:', response.data);
-      // Return the raw data to be used by the LLM
-      return response.data;
-    } else {
-      console.error('Error: Received empty response from the server.');
-      return 'Error: Received empty response from the server.';
-    }
-  } catch (error) {
-    console.error('Metadata query failed:', error);
-    return 'Error: Could not process the metadata query.';
-  }
-}
-
-
-
-// Explicitly define parameter types for the generate function
 async function submitUserMessage(content: string) {
   'use server';
 
-  console.log('submitUserMessage: Received user message:', content);
   const aiState = getMutableAIState<typeof AI>();
 
   aiState.update({
@@ -116,107 +72,112 @@ async function submitUserMessage(content: string) {
   let textStream: undefined | ReturnType<typeof createStreamableValue<string>>;
   let textNode: undefined | React.ReactNode;
 
-  try {
-    console.log('submitUserMessage: Streaming UI with user message.');
-    const result = await streamUI({
-      model: openai('gpt-4o'),
-      initial: <SpinnerMessage />,
-      system: `
-      You are "Creators' Library," a creator economy data instrumentation assistant. Your goal is to provide quick, actionable solutions tailored to the user's needs.
+ 
+  
+  const maxRetries = 3;
+  let retries = 0;
 
-      **Primary Goal:**  
-      - Use the outputs of tools like 'semanticSearchTool' and 'metadataQueryTool' to generate contextually enriched responses.
-      - Do not directly display tool outputs; instead, synthesize them into a user-friendly and actionable message.
+  while (retries < maxRetries) {
+    try {
+      const result = await streamUI({
+        model: openai('gpt-4o'), // Adjust the model if needed
+        initial: <SpinnerMessage />,
+        system: `
+        You are "Creators' Library," a creator economy data instrumentation assistant. Your goal is to provide quick, actionable solutions tailored to the user's needs, ensuring a seamless interaction.
 
-      **Handling Tool Outputs:**  
-      - After using a tool, integrate its result into a coherent, helpful response for the user.
-      - Only display the final LLM-generated response that utilizes the tool's information.
+        **Primary Goal:**  
+        - Quickly display key insights from the backend's initial response.
+        - Use tools to gather additional context and data if required.
+        - Show loading states or progress indicators while waiting for the backend to process detailed responses.
 
-      **User Guidance:**  
-      - Break down complex concepts into small, understandable chunks.
-      - Notify the user if additional information is required for a more detailed response.
-      `,
-      messages: [
-        ...aiState.get().messages,
-        {
-          role: 'system',
-          content: `
-            You have access to the 'semanticSearchTool' and 'metadataQueryTool' to fetch information. Use these tools to generate responses based on their outputs.
-          `,
+        **Handling Asynchronous Data:**  
+        - When receiving partial data, display it immediately to the user.
+        - Show a "Processing..." indicator or a loading animation for sections that are still being generated by the backend.
+        - Continuously poll or use WebSockets to stream data as the backend completes further processing.
+
+        **User Guidance:**  
+        - Break down complex concepts into small, understandable chunks.
+        - Notify the user if additional information is required for a more detailed response.
+        - For long-running tasks (e.g., detailed script creation), keep the user updated on progress and estimated completion time.
+        `,
+        messages: [
+          ...aiState.get().messages,
+          {
+            role: 'system',
+            content: `
+              You have access to the tool 'interactiveSessionTool' to fetch information. 
+              Use it to generate responses based on real-time data from the backend.
+            `,
+          },
+        ],
+        text: ({ content, done, delta }) => {
+          if (!textStream) {
+            textStream = createStreamableValue('');
+            textNode = <BotMessage content={textStream.value} />;
+          }
+
+          if (done) {
+            textStream.done();
+            aiState.update({
+              ...aiState.get(),
+              messages: [
+                ...aiState.get().messages,
+                {
+                  id: nanoid(),
+                  role: 'assistant',
+                  content,
+                },
+              ],
+            });
+          } else {
+            textStream.update(delta);
+          }
+
+          return textNode;
         },
-      ],
-      text: ({ content, done, delta }) => {
-        if (!textStream) {
-          console.log('submitUserMessage: Initializing text stream.');
-          textStream = createStreamableValue('');
-          textNode = <BotMessage content={textStream.value} />;
-        }
-
-        if (done) {
-          console.log('submitUserMessage: Stream done. Final content:', content);
-          textStream.done();
-          aiState.update({
-            ...aiState.get(),
-            messages: [
-              ...aiState.get().messages,
-              {
-                id: nanoid(),
-                role: 'assistant',
-                content,
-              },
-            ],
-          });
-        } else {
-          console.log('submitUserMessage: Updating text stream with delta:', delta);
-          textStream.update(delta);
-        }
-
-        return textNode;
-      },
-      tools: {
-        semanticSearchTool: {
-          description: 'Perform a semantic search to augment content with relevant information using HTTP requests.',
-          parameters: z.object({
-            query: z.string().describe('The user query to perform semantic search.'),
-          }),
-          generate: async ({ query }: { query: string }) => {
-            console.log('submitUserMessage: Using semanticSearchTool with query:', query);
-            const toolOutput = await semanticSearchTool(query);
-            // Return the tool output to the LLM for response generation
-            return `Semantic search tool result: ${JSON.stringify(toolOutput)}`;
+        tools: {
+          interactiveSessionTool: {
+            description: 'Interact with the WebSocket endpoint for complex data queries.',
+            parameters: z.object({
+              session_id: z.string().describe('The session ID for the WebSocket connection.'),
+              query: z.string().describe('The user query to send to the WebSocket endpoint.'),
+            }),
+            // Define parameter types for the function
+            generate: async ({ session_id, query }: { session_id: string; query: string }) => {
+              try {
+                const result = await interactiveSession(session_id, query);
+                return <BotMessage content={`Response: ${JSON.stringify(result)}`} />;
+              } catch (error) {
+                console.error('WebSocket interaction failed:', error);
+                return <SystemMessage>Error: Could not process the WebSocket request.</SystemMessage>;
+              }
+            },
           },
         },
-        metadataQueryTool: {
-          description: 'Execute a metadata query to fetch detailed creator information using HTTP requests.',
-          parameters: z.object({
-            query: z.string().describe('The query for executing metadata search.'),
-          }),
-          generate: async ({ query }: { query: string }) => {
-            console.log('submitUserMessage: Using metadataQueryTool with query:', query);
-            const toolOutput = await metadataQueryTool(query);
-            // Return the tool output to the LLM for response generation
-            return `Metadata query tool result: ${JSON.stringify(toolOutput)}`;
-          },
-        },
-      },
-    });
+      });
 
-    console.log('submitUserMessage: Successfully processed user message.');
-    return {
-      id: nanoid(),
-      display: result.value,
-    };
-  } catch (error: unknown) {
-    let errorMessage = 'Error: Could not process the request.';
-    if (error instanceof Error) {
-      errorMessage = `Error: ${error.message}`;
+      return {
+        id: nanoid(),
+        display: result.value,
+      };
+    } catch (error: any) {
+      console.error(`Attempt ${retries + 1} failed:`, error);
+      retries++;
+      if (retries === maxRetries) {
+        console.error('Max retries reached. Returning error message.');
+        let errorMessage = 'An error occurred. Please try again later.';
+        if (error.message && error.message.includes('Pipeline is empty')) {
+          errorMessage = 'The AI system is currently unavailable. Please try again in a few minutes.';
+        } else if (error.name === 'NetworkError' || !navigator.onLine) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
+        }
+        return {
+          id: nanoid(),
+          display: <SystemMessage>{errorMessage}</SystemMessage>,
+        };
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // Exponential backoff
     }
-
-    console.error('Failed to process user message:', errorMessage);
-    return {
-      id: nanoid(),
-      display: <SystemMessage>{errorMessage}</SystemMessage>,
-    };
   }
 }
 
@@ -234,53 +195,27 @@ export const AI = createAI<AIState, UIState>({
   actions: {
     submitUserMessage,
   },
-  tools: {
-    semanticSearchTool: {
-      description: 'Perform a semantic search to find relevant information to support and enhance responses.',
-      parameters: z.object({
-        query: z.string().describe('The user query to perform semantic search.'),
-      }),
-      generate: async ({ query }: { query: string }) => {
-        console.log('AI: Using semanticSearchTool with query:', query);
-        return semanticSearchTool(query);
-      },
-    },
-    metadataQueryTool: {
-      description: 'Execute a metadata query to fetch detailed creator information and context for enhanced responses.',
-      parameters: z.object({
-        query: z.string().describe('The query for executing metadata search.'),
-      }),
-      generate: async ({ query }: { query: string }) => {
-        console.log('AI: Using metadataQueryTool with query:', query);
-        return metadataQueryTool(query);
-      },
-    },
-  },
   initialAIState: { chatId: nanoid(), messages: [] },
   initialUIState: [],
-
   onGetUIState: async () => {
     'use server';
 
-    console.log('onGetUIState: Fetching UI state.');
     const session = await auth();
 
     if (session && session.user) {
       const aiState = getAIState() as Chat;
-      console.log('onGetUIState: Found AI state:', aiState);
 
       if (aiState) {
         const uiState = getUIStateFromAIState(aiState);
-        console.log('onGetUIState: Generated UI state:', uiState);
         return uiState;
       }
+    } else {
+      return;
     }
   },
-
   onSetAIState: async ({ state }) => {
     'use server';
 
-    console.log('onSetAIState: Setting AI state with state:', state);
     const session = await auth();
 
     if (session && session.user) {
@@ -302,14 +237,33 @@ export const AI = createAI<AIState, UIState>({
         path,
       };
 
-      console.log('onSetAIState: Saving chat with details:', chat);
       await saveChat(chat);
+    } else {
+      return;
     }
   },
-} as CustomAIConfig);
+  tools: {
+    interactiveSessionTool: {
+      description: 'Interact with the WebSocket endpoint for complex data queries.',
+      parameters: z.object({
+        session_id: z.string().describe('The session ID for the WebSocket connection.'),
+        query: z.string().describe('The user query to send to the WebSocket endpoint.'),
+      }),
+      // Define parameter types for the function
+      generate: async ({ session_id, query }: { session_id: string; query: string }) => {
+        try {
+          const result = await interactiveSession(session_id, query);
+          return <BotMessage content={`Response: ${JSON.stringify(result)}`} />;
+        } catch (error) {
+          console.error('WebSocket interaction failed:', error);
+          return <SystemMessage>Error: Could not process the WebSocket request.</SystemMessage>;
+        }
+      },
+    },
+  },
+} as CreateAIOptions);
 
 export const getUIStateFromAIState = (aiState: Chat) => {
-  console.log('getUIStateFromAIState: Converting AI state to UI state for AI state:', aiState);
   return aiState.messages
     .filter((message) => message.role !== 'system')
     .map((message, index) => ({
