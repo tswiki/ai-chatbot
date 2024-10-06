@@ -1,8 +1,7 @@
 
-
 import 'server-only';
 
-import { interactiveSession } from '../augmented_query';
+import { interactiveSessionTool } from '../augmented_query'; // Use interactiveSessionTool as defined earlier
 
 import {
   createAI,
@@ -24,7 +23,6 @@ import { saveChat } from '@/app/actions';
 import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
-
 
 function isChat(obj: any): obj is Chat {
   return (
@@ -71,8 +69,6 @@ async function submitUserMessage(content: string) {
 
   let textStream: undefined | ReturnType<typeof createStreamableValue<string>>;
   let textNode: undefined | React.ReactNode;
-
- 
   
   const maxRetries = 3;
   let retries = 0;
@@ -145,8 +141,8 @@ async function submitUserMessage(content: string) {
             // Define parameter types for the function
             generate: async ({ session_id, query }: { session_id: string; query: string }) => {
               try {
-                const result = await interactiveSession(session_id, query);
-                return <BotMessage content={`Response: ${JSON.stringify(result)}`} />;
+                const result = await interactiveSessionTool(session_id, query); // Use the interactiveSessionTool here
+                return <BotMessage content={`Response: ${JSON.stringify(result.response)}`} />;
               } catch (error) {
                 console.error('WebSocket interaction failed:', error);
                 return <SystemMessage>Error: Could not process the WebSocket request.</SystemMessage>;
@@ -252,8 +248,8 @@ export const AI = createAI<AIState, UIState>({
       // Define parameter types for the function
       generate: async ({ session_id, query }: { session_id: string; query: string }) => {
         try {
-          const result = await interactiveSession(session_id, query);
-          return <BotMessage content={`Response: ${JSON.stringify(result)}`} />;
+          const result = await interactiveSessionTool(session_id, query); // Use the interactiveSessionTool here
+          return <BotMessage content={`Response: ${JSON.stringify(result.response)}`} />;
         } catch (error) {
           console.error('WebSocket interaction failed:', error);
           return <SystemMessage>Error: Could not process the WebSocket request.</SystemMessage>;
