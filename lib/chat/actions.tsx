@@ -1,3 +1,5 @@
+
+
 import 'server-only';
 
 import { interactiveSessionTool } from '../augmented_query';
@@ -107,7 +109,7 @@ async function submitUserMessage(content: string) {
         - Conclude with a **Final Response** that answers the user's query in detail and in the format they requested.
 
         Use the following tool to enhance your responses:
-        - 'interactiveSessionTool': Provides real-time data from the backend via WebSocket. Ensure its usage for accurate and contextualized information.
+        - 'interactiveSessionTool': Provides real-time data from the backend via HTTP request. Ensure its usage for accurate and contextualized information.
         `,
         messages: [
           ...aiState.get().messages,
@@ -115,7 +117,7 @@ async function submitUserMessage(content: string) {
             role: 'system',
             content: `
               You have access to the tool 'interactiveSessionTool' to fetch information to ensure the accuracy and relevance of the generated information. 
-              Use it to generate responses based on real-time data (sockets connection) from the backend.
+              Use it to generate responses based on real-time data from the backend.
             `,
           },
         ],
@@ -146,16 +148,30 @@ async function submitUserMessage(content: string) {
         },
         tools: {
           interactiveSessionTool: {
-            description: 'Interact with the WebSocket endpoint for complex data queries to ensure that the information generated and returned is accurate.',
+            description: 'Interact with the HTTP endpoint for complex data queries to ensure that the information generated and returned is accurate.',
             parameters: z.object({
-              session_id: z.string().describe('The session ID for the WebSocket connection.'),
-              query: z.string().describe('The user query to send to the WebSocket endpoint.'),
+              session_id: z.string().describe('The session ID for the HTTP request.'),
+              query: z.string().describe('The user query to send to the HTTP endpoint.'),
             }),
             generate: async ({ session_id, query }: { session_id: string; query: string }) => {
               try {
                 const result = await interactiveSessionTool(session_id, query); // Use the interactiveSessionTool here
-        
-                if ('response' in result) {
+                
+                if (typeof result === 'string') {
+                  // It's an error message
+                  aiState.update({
+                    ...aiState.get(),
+                    messages: [
+                      ...aiState.get().messages,
+                      {
+                        id: nanoid(),
+                        role: 'assistant',
+                        content: result,
+                      },
+                    ],
+                  });
+                  return result;
+                } else if ('response' in result) {
                   // Update AI state with tool response
                   aiState.update({
                     ...aiState.get(),
@@ -169,24 +185,10 @@ async function submitUserMessage(content: string) {
                     ],
                   });
                   return `Tool Response: ${result.response}`;
-                } else if ('error' in result) {
-                  // Update AI state with error message
-                  aiState.update({
-                    ...aiState.get(),
-                    messages: [
-                      ...aiState.get().messages,
-                      {
-                        id: nanoid(),
-                        role: 'assistant',
-                        content: `Error: ${result.error}`,
-                      },
-                    ],
-                  });
-                  return `Error: ${result.error}`;
                 }
               } catch (error) {
-                console.error('WebSocket interaction failed:', error);
-                return 'Error: Could not process the WebSocket request.';
+                console.error('HTTP request interaction failed:', error);
+                return 'Error: Could not process the HTTP request.';
               }
             },
           },
