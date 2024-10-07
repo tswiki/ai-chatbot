@@ -25,6 +25,8 @@ import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
 
+import { LanguageModelV1 } from '@ai-sdk/provider';
+
 
 
 
@@ -115,7 +117,7 @@ async function submitUserMessage(content: string) {
   while (retries < maxRetries) {
     try {
       const result = await streamUI({
-        model: openai('gpt-4o'),  // Changed from 'gpt-4o' to 'gpt-4'
+        model: openai('gpt-4') as LanguageModelV1,  // Explicitly casting to LanguageModelV1 if needed
         initial: <SpinnerMessage />,
         system: `
 
