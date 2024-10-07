@@ -6,7 +6,7 @@ const interactiveSessionTool = async (
   sessionId: string,
   query: string,
   maxRetries: number = 3
-): Promise<{ response: string } | { error: string }> => {
+): Promise<{ response: string; detailedResponse?: string } | { error: string }> => {
   // Define the URL for the Axios request
   const url = 'https://agentic-rag-m21c.onrender.com/interactive-session';
 
