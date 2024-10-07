@@ -1,78 +1,57 @@
+function getCookie(name: string): string | undefined {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+}
 
+const interactiveSessionTool = async (sessionId: string, query: string): Promise<{ response: string } | { error: string }> => {
+  // Retrieve the token from localStorage, sessionStorage, or cookies
+  const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || getCookie('auth_token');
 
-export const interactiveSessionTool = async (sessionId: string, query: string): Promise<{ sessionId: string; response: any; error?: string }> => {
-  // Validate the session ID
-  const validSessionId: string = String(sessionId);
+  // Append token as a query parameter in the URL
+  const url = `wss://agentic-rag-m21c.onrender.com/ws/interactive-session?token=${token}`;
 
-  // Define the WebSocket URL
-  const url = 'wss://agentic-rag-m21c.onrender.com/ws/interactive-session';
+  return new Promise((resolve, reject) => {
+    try {
+      // Connect to the WebSocket
+      const socket = new WebSocket(url);
 
-  // Create a promise to handle asynchronous communication with the WebSocket
-  return new Promise((resolve) => {
-    // Create a new WebSocket instance
-    const socket = new WebSocket(url);
-
-    // Retry logic variables
-    let retries = 0;
-    const maxRetries = 3;
-
-    // Define the payload to send to the WebSocket
-    const payload = {
-      session_id: validSessionId,
-      user_query: query,
-    };
-
-    // Function to handle incoming WebSocket messages
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        // Handle different types of responses
-        if (data.response) {
-          resolve({ sessionId: validSessionId, response: data.response }); // Resolve with the response data
-          socket.close(); // Close the WebSocket connection after receiving the response
-        } else if (data.error) {
-          resolve({ sessionId: validSessionId, response: null, error: data.error }); // Resolve with an error
-          socket.close(); // Close the WebSocket connection after an error
-        }
-      } catch (error) {
-        resolve({ sessionId: validSessionId, response: null, error: `Processing error: ${error}` }); // Resolve with a processing error
-        socket.close(); // Close the WebSocket connection
-      }
-    };
-
-    // Function to handle WebSocket errors
-    const handleError = () => {
-      if (retries < maxRetries) {
-        retries++;
-        setTimeout(attemptConnection, 1000 * retries); // Exponential backoff
-      } else {
-        resolve({ sessionId: validSessionId, response: null, error: 'WebSocket error occurred. Maximum retries reached.' });
-      }
-    };
-
-    // Function to handle WebSocket close events
-    const handleClose = (event: CloseEvent) => {
-      if (!event.wasClean && retries < maxRetries) {
-        retries++;
-        setTimeout(attemptConnection, 1000 * retries); // Exponential backoff
-      } else if (!event.wasClean) {
-        resolve({ sessionId: validSessionId, response: null, error: `Unexpected WebSocket closure. Code: ${event.code}, Reason: ${event.reason}` });
-      }
-    };
-
-    // Attempt to connect to the WebSocket
-    const attemptConnection = () => {
-      // Set up WebSocket event handlers
       socket.onopen = () => {
+        // Construct the payload
+        const payload = {
+          session_id: sessionId,
+          user_query: query,
+        };
+
+        console.log('Sending payload to WebSocket:', payload);
         socket.send(JSON.stringify(payload));
       };
-      socket.onmessage = handleMessage;
-      socket.onerror = handleError;
-      socket.onclose = handleClose;
-    };
 
-    // Initial connection attempt
-    attemptConnection();
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.response) {
+          resolve({ response: `Final response: ${data.response}` });
+        } else if (data.error) {
+          console.error(`Error from WebSocket: ${data.error}`);
+          reject({ error: data.error });
+        }
+      };
+
+      socket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        reject({ error: 'WebSocket encountered an error.' });
+      };
+
+      socket.onclose = () => {
+        console.log('WebSocket connection closed.');
+        // Reject if the connection closes unexpectedly without resolving
+        reject({ error: 'WebSocket connection closed unexpectedly.' });
+      };
+    } catch (error) {
+      console.error('An error occurred:', error);
+      reject({ error: 'An error occurred while establishing the WebSocket connection.' });
+    }
   });
 };
+
+export { interactiveSessionTool };
