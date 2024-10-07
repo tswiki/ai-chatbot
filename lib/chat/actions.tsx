@@ -1,5 +1,4 @@
 
-
 import 'server-only';
 
 import { interactiveSessionTool } from '../augmented_query';
@@ -17,6 +16,7 @@ import { openai } from '@ai-sdk/openai';
 
 import { BotMessage, SystemMessage } from '@/components/stocks';
 import { z } from 'zod';
+import { tool } from 'ai';
 
 import { nanoid } from '@/lib/utils';
 
@@ -24,6 +24,9 @@ import { saveChat } from '@/app/actions';
 import { SpinnerMessage, UserMessage } from '@/components/stocks/message';
 import { Chat, Message } from '@/lib/types';
 import { auth } from '@/auth';
+
+
+
 
 function isChat(obj: any): obj is Chat {
   return (
@@ -39,16 +42,27 @@ function isChat(obj: any): obj is Chat {
   );
 }
 
-// Extend the type of createAI to include tools
-interface CreateAIOptions {
-  actions: {
-    submitUserMessage: (content: string) => Promise<{ id: string; display: React.ReactNode }>;
-  };
-  initialAIState: AIState;
-  initialUIState: UIState;
-  onGetUIState: () => Promise<UIState | undefined>;
-  onSetAIState: ({ state }: { state: AIState }) => Promise<void>;
-  tools?: Record<string, any>; // Add the optional tools property
+async function processMessage(session_id: string, content: string): Promise<string | undefined> {
+  
+  try {
+    
+    const index = await interactiveSessionTool(session_id, content);
+
+    // If index is an object, convert it to a string format that makes sense.
+    let indexString = '';
+    if (typeof index === 'object') {
+      indexString = JSON.stringify(index, null, 2); // Convert object to a pretty-printed string
+    } else {
+      indexString = String(index); // Ensure index is a string
+    }
+
+    const text = `Answer this query: '${content}' using this information: '${indexString}' as the only source of context and knowledge. Do not generate any additional information if provided context is inadequate; instead, return a friendly message explaining that the user's request cannot currently be processed due to limited or insufficient training or contextual information available. Please provide more specific information or try a different query.`;
+
+    return text;
+  } catch (error) {
+    console.error('Failed to augment content:', error);
+    return undefined;
+  }
 }
 
 async function submitUserMessage(content: string) {
@@ -56,7 +70,6 @@ async function submitUserMessage(content: string) {
 
   const aiState = getMutableAIState<typeof AI>();
 
-  // Update the AI state with the user's message
   aiState.update({
     ...aiState.get(),
     messages: [
@@ -71,56 +84,57 @@ async function submitUserMessage(content: string) {
 
   let textStream: undefined | ReturnType<typeof createStreamableValue<string>>;
   let textNode: undefined | React.ReactNode;
-  
+
+  // Process messages before passing them to streamUI
+  const processedMessages = await Promise.all(
+    aiState.get().messages.map(async (message: any) => {
+      let processedContent = message.content;
+      const session = await auth();
+
+      if (message.role === 'user') {
+        const sessionId = session?.user?.id || crypto.randomUUID();
+        const result = await processMessage(sessionId, message.content);
+        processedContent = result || message.content;
+      }
+
+      if (typeof processedContent === 'object') {
+        processedContent = JSON.stringify(processedContent, null, 2);
+      }
+
+      return {
+        role: message.role,
+        content: processedContent,
+        name: message.name,
+      };
+    })
+  );
+
   const maxRetries = 3;
   let retries = 0;
 
   while (retries < maxRetries) {
     try {
       const result = await streamUI({
-        model: openai('gpt-4o'), // Adjust the model if needed
+        model: openai('gpt-4o'),  // Changed from 'gpt-4o' to 'gpt-4'
         initial: <SpinnerMessage />,
         system: `
-        You are "Creators' Library," a creator economy data instrumentation assistant. Your goal is to provide quick, actionable solutions tailored to the user's needs, ensuring a seamless interaction.
 
-        **Primary Goal:**  
-        - Quickly display key insights from the backend's initial response.
-        - Use tools to gather additional context and data if required, especially using the 'interactiveSessionTool' for complex queries.
-        - Provide a final, fully contextualized answer based on the initial data and tool-generated insights.
+        You are "Creators' Library," a creator economy data instrumentation assistant. Your primary function is to help users achieve their goals and solve their problems by providing concise, accurate, and data-backed information in an easy-to-understand, actionable format.
 
-        **Handling Responses:**  
-        - **Initial Thoughts:** Begin by sharing an initial summary or thought process based on the input query to set the context.
-        - **Tool Response:** Use 'interactiveSessionTool' for real-time data. Incorporate the response into your final answer to ensure accuracy and relevance.
-        - **Final Response:** After receiving data from the tool, synthesize a comprehensive response formatted as per the user's query. 
+        Primary Goal:
 
-        **Handling Asynchronous Data:**  
-        - When receiving partial data, display it immediately to the user.
-        - Show a "Processing..." indicator or a loading animation for sections still being processed by the backend.
-        - Continuously poll or use WebSockets to stream data as the backend completes further processing.
+        Quickly display key insights from the backend's initial response.
+        Use tools, especially the 'interactiveSessionTool,' to gather additional context and data for more complex queries.
+        Provide a final, contextualized response that directly addresses the user's query with clear, actionable insights.
 
-        **User Guidance:**  
-        - Break down complex concepts into small, understandable chunks.
-        - Notify the user if additional information is required for a more detailed response.
-        - For long-running tasks (e.g., detailed script creation), keep the user updated on progress and estimated completion time.
+        User Guidance:
 
-        **Response Format:**  
-        - Start with **Initial Thoughts** for context.
-        - Follow up with **Tool Response** to integrate real-time data from the backend.
-        - Conclude with a **Final Response** that answers the user's query in detail and in the format they requested.
+        Proactively break down complex ideas into manageable steps.
+        Notify the user if additional information is needed for a more detailed response.
+        For long-running tasks, keep the user updated with progress indicators and estimated completion times.
 
-        Use the following tool to enhance your responses:
-        - 'interactiveSessionTool': Provides real-time data from the backend via HTTP request. Ensure its usage for accurate and contextualized information.
         `,
-        messages: [
-          ...aiState.get().messages,
-          {
-            role: 'system',
-            content: `
-              You have access to the tool 'interactiveSessionTool' to fetch information to ensure the accuracy and relevance of the generated information. 
-              Use it to generate responses based on real-time data from the backend.
-            `,
-          },
-        ],
+        messages: processedMessages,
         text: ({ content, done, delta }) => {
           if (!textStream) {
             textStream = createStreamableValue('');
@@ -145,53 +159,6 @@ async function submitUserMessage(content: string) {
           }
 
           return textNode;
-        },
-        tools: {
-          interactiveSessionTool: {
-            description: 'Interact with the HTTP endpoint for complex data queries to ensure that the information generated and returned is accurate.',
-            parameters: z.object({
-              session_id: z.string().describe('The session ID for the HTTP request.'),
-              query: z.string().describe('The user query to send to the HTTP endpoint.'),
-            }),
-            generate: async ({ session_id, query }: { session_id: string; query: string }) => {
-              try {
-                const result = await interactiveSessionTool(session_id, query); // Use the interactiveSessionTool here
-                
-                if (typeof result === 'string') {
-                  // It's an error message
-                  aiState.update({
-                    ...aiState.get(),
-                    messages: [
-                      ...aiState.get().messages,
-                      {
-                        id: nanoid(),
-                        role: 'assistant',
-                        content: result,
-                      },
-                    ],
-                  });
-                  return result;
-                } else if ('response' in result) {
-                  // Update AI state with tool response
-                  aiState.update({
-                    ...aiState.get(),
-                    messages: [
-                      ...aiState.get().messages,
-                      {
-                        id: nanoid(),
-                        role: 'assistant',
-                        content: `Tool Response: ${result.response}`,
-                      },
-                    ],
-                  });
-                  return `Tool Response: ${result.response}`;
-                }
-              } catch (error) {
-                console.error('HTTP request interaction failed:', error);
-                return 'Error: Could not process the HTTP request.';
-              }
-            },
-          },
         },
       });
 
@@ -220,6 +187,8 @@ async function submitUserMessage(content: string) {
   }
 }
 
+
+
 export type AIState = {
   chatId: string;
   messages: Message[];
@@ -234,8 +203,10 @@ export const AI = createAI<AIState, UIState>({
   actions: {
     submitUserMessage,
   },
-  initialAIState: { chatId: nanoid(), messages: [] },
   initialUIState: [],
+  initialAIState: { chatId: nanoid(), messages: [] },
+  
+  
   onGetUIState: async () => {
     'use server';
 
@@ -252,6 +223,7 @@ export const AI = createAI<AIState, UIState>({
       return;
     }
   },
+
   onSetAIState: async ({ state }) => {
     'use server';
 
@@ -281,7 +253,7 @@ export const AI = createAI<AIState, UIState>({
       return;
     }
   },
-} as CreateAIOptions);
+});
 
 export const getUIStateFromAIState = (aiState: Chat) => {
   return aiState.messages
