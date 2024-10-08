@@ -49,7 +49,7 @@ export const getSessionId = async (): Promise<string> => {
 
   if (session?.user?.id) {
     // If the user is authenticated, use their user ID as the session ID
-    sessionId = String(session.user.id);
+    sessionId = String(session?.user?.id);
     localStorage.setItem('sessionId', sessionId);
   } else if (!sessionId) {
     // If no session ID is stored, generate a new one
