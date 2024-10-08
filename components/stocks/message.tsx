@@ -8,6 +8,15 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { StreamableValue } from 'ai/rsc'
 import { useStreamableText } from '@/lib/hooks/use-streamable-text'
+import { HTMLAttributes } from 'react'
+import React from 'react';
+
+// Define a custom type for code props
+interface CodeProps extends HTMLAttributes<HTMLElement> {
+  inline?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+}
 
 // Different types of message bubbles.
 
@@ -15,13 +24,13 @@ export function UserMessage({ children }: { children: React.ReactNode }) {
   return (
     <div className="group relative flex items-start md:-ml-12">
       <div className="flex items-center justify-center rounded-full border-2 border-white-500 bg-white p-1 shadow-sm">
-  <img
-    src="/user/favicon.ico"
-    width={25}
-    height={25}
-    style={{ display: 'block' }}
-  />
-</div>
+        <img
+          src="/user/favicon.ico"
+          width={25}
+          height={25}
+          style={{ display: 'block' }}
+        />
+      </div>
       <div className="ml-4 flex-1 space-y-2 overflow-hidden pl-2">
         {children}
       </div>
@@ -41,14 +50,14 @@ export function BotMessage({
   return (
     <div className={cn('group relative flex items-start md:-ml-12', className)}>
       <div className="flex items-center justify-center rounded-full border-2 border-white p-1">
-  <img
-    src="/inverted/favicon.ico"
-    className="size-6"
-    width={48} // Adjust the width as needed
-    height={48} // Adjust the height as needed
-    style={{ display: 'block', margin: 'auto' }} // Ensures the image is centered
-  />
-</div>
+        <img
+          src="/inverted/favicon.ico"
+          className="size-6"
+          width={48} // Adjust the width as needed
+          height={48} // Adjust the height as needed
+          style={{ display: 'block', margin: 'auto' }} // Ensures the image is centered
+        />
+      </div>
       <div className="ml-4 flex-1 space-y-2 overflow-hidden px-1">
         <MemoizedReactMarkdown
           className="prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0"
@@ -57,35 +66,37 @@ export function BotMessage({
             p({ children }) {
               return <p className="mb-2 last:mb-0">{children}</p>
             },
-            code({ inline, className, children, ...props }) {
-              if (children.length) {
-                if (children[0] == '▍') {
+            code({ inline, className, children, ...props }: CodeProps) {
+              const childrenArray = React.Children.toArray(children);
+            
+              if (childrenArray.length) {
+                if (childrenArray[0] === '▍') {
                   return (
                     <span className="mt-1 animate-pulse cursor-default">▍</span>
-                  )
+                  );
                 }
-
-                children[0] = (children[0] as string).replace('`▍`', '▍')
+            
+                childrenArray[0] = (childrenArray[0] as string).replace('`▍`', '▍');
               }
-
-              const match = /language-(\w+)/.exec(className || '')
-
+            
+              const match = /language-(\w+)/.exec(className || '');
+            
               if (inline) {
                 return (
                   <code className={className} {...props}>
-                    {children}
+                    {childrenArray}
                   </code>
-                )
+                );
               }
-
+            
               return (
                 <CodeBlock
                   key={Math.random()}
                   language={(match && match[1]) || ''}
-                  value={String(children).replace(/\n$/, '')}
+                  value={String(childrenArray).replace(/\n$/, '')}
                   {...props}
                 />
-              )
+              );
             }
           }}
         >
@@ -111,11 +122,11 @@ export function BotCard({
         )}
       >
         <img
-    src="/inverted/favicon.ico"
-    className="hidden size-6 mr-2 dark:block"
-    width={48} // Adjust the width as needed
-    height={48} // Adjust the height as needed
-  />
+          src="/inverted/favicon.ico"
+          className="hidden size-6 mr-2 dark:block"
+          width={48} // Adjust the width as needed
+          height={48} // Adjust the height as needed
+        />
       </div>
       <div className="ml-4 flex-1 pl-2">{children}</div>
     </div>
@@ -138,14 +149,14 @@ export function SpinnerMessage() {
   return (
     <div className="group relative flex items-start md:-ml-12">
       <div className="flex items-center justify-center rounded-full border-2 border-white p-1">
-  <img
-    src="/inverted/favicon.ico"
-    className="size-6"
-    width={48} // Adjust the width as needed
-    height={48} // Adjust the height as needed
-    style={{ display: 'block', margin: 'auto' }} // Ensures the image is centered
-  />
-</div>
+        <img
+          src="/inverted/favicon.ico"
+          className="size-6"
+          width={48} // Adjust the width as needed
+          height={48} // Adjust the height as needed
+          style={{ display: 'block', margin: 'auto' }} // Ensures the image is centered
+        />
+      </div>
       <div className="ml-4 h-[24px] flex flex-row items-center flex-1 space-y-2 overflow-hidden px-1">
         {spinner}
       </div>

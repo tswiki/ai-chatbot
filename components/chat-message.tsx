@@ -1,53 +1,61 @@
-import { Message } from 'ai'
-import remarkGfm from 'remark-gfm'
-import remarkMath from 'remark-math'
-import { useTheme } from 'next-themes'
-import { HTMLAttributes } from 'react';
 
 
-import { cn } from '@/lib/utils'
-import { CodeBlock } from '@/components/ui/codeblock'
-import { MemoizedReactMarkdown } from '@/components/markdown'
-import { ChatMessageActions } from '@/components/chat-message-actions'
+import { Message } from 'ai';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import { useTheme } from 'next-themes';
+import { HTMLAttributes, ReactNode } from 'react';
+import { cn } from '@/lib/utils';
+import { CodeBlock } from '@/components/ui/codeblock';
+import { MemoizedReactMarkdown } from '@/components/markdown';
+import { ChatMessageActions } from '@/components/chat-message-actions';
 
 export interface ChatMessageProps {
-  message: Message
+  message: Message;
 }
 
 interface CodeProps extends HTMLAttributes<HTMLElement> {
   inline?: boolean;
   className?: string;
-  children?: React.ReactNode;
+  children?: ReactNode | ReactNode[];
 }
 
-
 export function ChatMessage({ message, ...props }: ChatMessageProps) {
-  const { theme } = useTheme()
-  
+  const { theme } = useTheme();
+
   return (
     <div
       className={cn('group relative mb-4 flex items-start md:-ml-12')}
       {...props}
     >
       <div
-        className={cn('flex size-8 shrink-0 select-none items-center justify-center rounded-md border shadow',
+        className={cn(
+          'flex size-8 shrink-0 select-none items-center justify-center rounded-md border shadow',
           message.role === 'user'
-            ? `flex items-center justify-center rounded-full border-2 ${theme === 'dark' ? 'border-white' : 'border-black'} bg-white p-1 shadow-sm`
-            : `flex items-center justify-center rounded-full border-2 ${theme === 'dark' ? 'border-black' : 'border-white'} p-1`
+            ? `flex items-center justify-center rounded-full border-2 ${
+                theme === 'dark' ? 'border-white' : 'border-black'
+              } bg-white p-1 shadow-sm`
+            : `flex items-center justify-center rounded-full border-2 ${
+                theme === 'dark' ? 'border-black' : 'border-white'
+              } p-1`
         )}
       >
-        {message.role === 'user' ? <img
-          src="/user/favicon.ico"
-          width={25}
-          height={25}
-          style={{ display: 'block', margin: 'auto'  }}
-        /> : <img
-            src={theme === 'dark' ? "/inverted/favicon.ico" : "/favicon.ico"}
+        {message.role === 'user' ? (
+          <img
+            src="/user/favicon.ico"
+            width={25}
+            height={25}
+            style={{ display: 'block', margin: 'auto' }}
+          />
+        ) : (
+          <img
+            src={theme === 'dark' ? '/inverted/favicon.ico' : '/favicon.ico'}
             className="size-6"
             width={48}
             height={48}
             style={{ display: 'block', margin: 'auto' }}
-      />}
+          />
+        )}
       </div>
       <div className="flex-1 px-1 ml-4 space-y-2 overflow-hidden">
         <MemoizedReactMarkdown
@@ -55,27 +63,27 @@ export function ChatMessage({ message, ...props }: ChatMessageProps) {
           remarkPlugins={[remarkGfm, remarkMath]}
           components={{
             p({ children }) {
-              return <p className="mb-2 last:mb-0">{children}</p>
+              return <p className="mb-2 last:mb-0">{children}</p>;
             },
-            code({inline, className, children, ...props }) {
-              if (children.length) {
-                if (children[0] == '▍') {
+            code: ({ inline, className, children, ...props }: CodeProps) => {
+              if (children && Array.isArray(children) && children.length) {
+                if (children[0] === '▍') {
                   return (
                     <span className="mt-1 cursor-default animate-pulse">▍</span>
-                  )
+                  );
                 }
 
-                children[0] = (children[0] as string).replace('`▍`', '▍')
+                children[0] = (children[0] as string).replace('`▍`', '▍');
               }
 
-              const match = /language-(\w+)/.exec(className || '')
+              const match = /language-(\w+)/.exec(className || '');
 
               if (inline) {
                 return (
                   <code className={className} {...props}>
                     {children}
                   </code>
-                )
+                );
               }
 
               return (
@@ -85,8 +93,8 @@ export function ChatMessage({ message, ...props }: ChatMessageProps) {
                   value={String(children).replace(/\n$/, '')}
                   {...props}
                 />
-              )
-            }
+              );
+            },
           }}
         >
           {message.content}
@@ -94,5 +102,5 @@ export function ChatMessage({ message, ...props }: ChatMessageProps) {
         <ChatMessageActions message={message} />
       </div>
     </div>
-  )
+  );
 }
