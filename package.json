@@ -1,19 +1,23 @@
 {
   "private": true,
+  "packageManager": "pnpm@8.6.3",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbo",
     "build": "next build",
+    "build:prod": "next build && next lint",
     "start": "next start",
+    "preview": "next build && next start",
     "lint": "next lint",
     "lint:fix": "eslint --fix .",
-    "build:prod": "next build && next lint",
-    "preview": "next build && next start",
     "seed": "node -r dotenv/config ./scripts/seed.mjs",
     "type-check": "tsc --noEmit",
     "format:write": "prettier --write \"{app,lib,components}/**/*.{ts,tsx,mdx}\" --cache",
-    "format:check": "prettier --check \"{app,lib,components}**/*.{ts,tsx,mdx}\" --cache"
+    "format:check": "prettier --check \"{app,lib,components}/**/*.{ts,tsx,mdx}\" --cache",
+    "clean:install": "rm -rf node_modules pnpm-lock.yaml && pnpm install",
+    "clean": "npx rimraf node_modules .next pnpm-lock.yaml"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^0.0.66",
     "@ai-sdk/provider": "0.0.24",
     "@radix-ui/react-alert-dialog": "^1.1.2",
     "@radix-ui/react-avatar": "^1.1.1",
@@ -32,7 +36,7 @@
     "@vercel/kv": "^3.0.0",
     "@vercel/og": "^0.6.3",
     "@vercel/speed-insights": "^1.0.12",
-    "ai": "^3.4.9",
+    "ai": "3.4.9",
     "axios": "^1.7.7",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
@@ -47,7 +51,7 @@
     "next-auth": "5.0.0-beta.4",
     "next-themes": "^0.3.0",
     "openai": "^4.67.2",
-    "posthog-js": "^1.166.2",
+    "posthog-js": "^1.167.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-intersection-observer": "^9.13.1",
@@ -73,21 +77,36 @@
     "@typescript-eslint/eslint-plugin": "^8.8.1",
     "@typescript-eslint/parser": "^8.8.1",
     "autoprefixer": "^10.4.20",
+    "babel-loader": "^9.2.1",
     "dotenv": "^16.4.5",
-    "eslint": "^9.12.0",
+    "eslint": "^8",
     "eslint-config-next": "^14.2.14",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-jsx-a11y": "^6.10.0",
+    "eslint-plugin-react": "^7.37.1",
+    "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-tailwindcss": "^3.17.4",
+    "html-webpack-plugin": "^5.6.0",
+    "mini-css-extract-plugin": "^2.9.1",
     "postcss": "^8.4.47",
     "prettier": "^3.3.3",
+    "rimraf": "^6.0.1",
     "tailwind-merge": "^2.5.3",
     "tailwindcss": "^3.4.13",
     "tailwindcss-animate": "^1.0.7",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "webpack": "^5.95.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.1.0"
   },
-  "rules": {
-    "react/no-unescaped-entities": "off",
-    "tailwindcss/no-contradicting-classname": "off"
+  "eslintConfig": {
+    "rules": {
+      "react/no-unescaped-entities": "off",
+      "tailwindcss/no-contradicting-classname": "off"
+    }
   },
-  "packageManager": "pnpm@8.6.3"
+  "resolutions": {
+    "@ai-sdk/provider": "0.0.24"
+  }
 }

@@ -2,6 +2,8 @@ import { Message } from 'ai'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { useTheme } from 'next-themes'
+import { HTMLAttributes } from 'react';
+
 
 import { cn } from '@/lib/utils'
 import { CodeBlock } from '@/components/ui/codeblock'
@@ -11,6 +13,13 @@ import { ChatMessageActions } from '@/components/chat-message-actions'
 export interface ChatMessageProps {
   message: Message
 }
+
+interface CodeProps extends HTMLAttributes<HTMLElement> {
+  inline?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+}
+
 
 export function ChatMessage({ message, ...props }: ChatMessageProps) {
   const { theme } = useTheme()
