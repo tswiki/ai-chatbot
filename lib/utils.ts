@@ -2,9 +2,18 @@ import { clsx, type ClassValue } from 'clsx'
 import { customAlphabet } from 'nanoid'
 import { twMerge } from 'tailwind-merge'
 
+
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  // Combine clsx functionality and filter non-truthy values
+  const mergedClasses = twMerge(clsx(...inputs));
+  
+  // Further filter and join the classes to ensure valid class names
+  return mergedClasses
+    .split(' ') // Split into individual classes
+    .filter(Boolean) // Filter out any falsy values
+    .join(' '); // Join them back into a string
 }
+
 
 export const nanoid = customAlphabet(
   '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
@@ -127,4 +136,6 @@ export async function retry<T>(
     }
   }
   throw lastError!;
-}
+};
+
+

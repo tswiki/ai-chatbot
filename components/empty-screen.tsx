@@ -9,7 +9,7 @@ export function EmptyScreen() {
         <p></p>
         <p className="leading-normal text-muted-foreground">
          Creators' Library uses your favourite creators' concepts and models to enhance your
-         direct marketing campaigns. It helps you craft the necessary copywriting, content and 
+         direct response marketing campaigns. It helps you craft the necessary copywriting, content and 
          workflow strategies required to drive market defining conversions within
          your info business.
         </p>
