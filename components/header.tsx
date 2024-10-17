@@ -67,7 +67,7 @@ export async function Header() {
       </CollectionsPopover>
 
         <a
-          href="https://forms.gle/PgoMnMJ7Hq1dppES7"
+          href="https://l0ni6p6jl0x.typeform.com/to/KsVsWulI"
           target="_blank"
           className={cn(buttonVariants())}
         >
