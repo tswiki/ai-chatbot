@@ -72,6 +72,11 @@ export function CollectionsPopover({ className, children }: CollectionsPopoverPr
           <AlertDialogTitle className="text-2xl font-bold text-center">
             Currently Indexed Creators
           </AlertDialogTitle>
+          
+          {/* Subheading in italics */}
+          <p className="text-lg italic text-center mt-2">
+            Scroll for your favourite creator
+          </p>
         </AlertDialogHeader>
 
         {/* Scrollable section for names */}
