@@ -94,6 +94,7 @@ export function CollectionsPopover({ className, children }: CollectionsPopoverPr
             <div className="text-lg relative">
               <div className="py-2 border-b border-t border-gray-300">Alex Hormozi</div>
               <div className="py-2 border-b border-t border-gray-300">Iman Gadhzi</div>
+              <div className="py-2 border-b border-gray-300">BAD Marketing</div>
               <div className="py-2 border-b border-gray-300">Serge Gatari</div>
               <div className="py-2 border-b border-gray-300">Ben Bader</div>
               <div className="py-2 border-b border-gray-300">Pierre Khoury</div>
