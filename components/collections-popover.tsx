@@ -75,7 +75,7 @@ export function CollectionsPopover({ className, children }: CollectionsPopoverPr
           
           {/* Subheading in italics */}
           <p className="text-lg italic text-center mt-2">
-            Scroll for your favourite creator
+            Scroll past Alex Hormozi for more creators.
           </p>
         </AlertDialogHeader>
 
